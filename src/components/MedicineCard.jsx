@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
 import { Card, Button, Badge } from './ui/BaseComponents';
 import { Edit2, Trash2, AlertCircle, Clock, Pill } from 'lucide-react';
+import { DeleteModal } from './DeleteModal';
 
 export const MedicineCard = ({ medicine, onEdit, onDelete }) => {
+    const count = medicine.count || 1;
+    const allIds = medicine.allIds || [medicine.id];
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
     // Calculate days/months until expiry
     const calculateTimeLeft = (dateStr) => {
         if (!dateStr) return null;
@@ -67,57 +72,77 @@ export const MedicineCard = ({ medicine, onEdit, onDelete }) => {
         medicine.activeIngredient3
     ].filter(ing => ing && ing.trim() !== '');
 
+    const handleDeleteConfirm = (deleteCount) => {
+        // Get the IDs to delete (first N items)
+        const idsToDelete = allIds.slice(0, deleteCount);
+        onDelete(medicine.id, idsToDelete);
+    };
+
     return (
-        <Card className="flex flex-col h-full hover:shadow-md transition-shadow relative overflow-hidden group">
-            {status === 'expired' && (
-                <div className="absolute top-0 left-0 w-full h-1 bg-red-500" />
-            )}
+        <>
+            <Card className="flex flex-col h-full hover:shadow-md transition-shadow relative overflow-hidden group">
+                {status === 'expired' && (
+                    <div className="absolute top-0 left-0 w-full h-1 bg-red-500" />
+                )}
 
-            <div className="flex justify-between items-start mb-2">
-                <Badge variant={getStatusColor(status)}>{badgeText}</Badge>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => onEdit(medicine)} className="p-1 hover:bg-gray-100 rounded text-gray-600">
-                        <Edit2 size={16} />
-                    </button>
-                    <button onClick={() => onDelete(medicine.id)} className="p-1 hover:bg-red-50 rounded text-red-500">
-                        <Trash2 size={16} />
-                    </button>
+                <div className="flex justify-between items-start mb-2">
+                    <div className="flex gap-2 items-center">
+                        <Badge variant={getStatusColor(status)}>{badgeText}</Badge>
+                        {count > 1 && (
+                            <Badge variant="purple" className="font-bold">x{count}</Badge>
+                        )}
+                    </div>
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => onEdit(medicine)} className="p-1 hover:bg-gray-100 rounded text-gray-600">
+                            <Edit2 size={16} />
+                        </button>
+                        <button onClick={() => setIsDeleteModalOpen(true)} className="p-1 hover:bg-red-50 rounded text-red-500">
+                            <Trash2 size={16} />
+                        </button>
+                    </div>
                 </div>
-            </div>
 
-            <h3 className="text-lg font-bold text-gray-800 mb-1">{medicine.name}</h3>
+                <h3 className="text-lg font-bold text-gray-800 mb-1">{medicine.name}</h3>
 
-            {activeIngredients.length > 0 && (
-                <div className="mb-3 flex flex-wrap gap-1">
-                    {activeIngredients.map((ingredient, index) => (
-                        <span key={index} className="inline-flex items-center gap-1 text-xs bg-purple-50 text-purple-700 px-2 py-1 rounded-full">
-                            <Pill size={12} />
-                            {ingredient}
-                        </span>
-                    ))}
+                {activeIngredients.length > 0 && (
+                    <div className="mb-3 flex flex-wrap gap-1">
+                        {activeIngredients.map((ingredient, index) => (
+                            <span key={index} className="inline-flex items-center gap-1 text-xs bg-purple-50 text-purple-700 px-2 py-1 rounded-full">
+                                <Pill size={12} />
+                                {ingredient}
+                            </span>
+                        ))}
+                    </div>
+                )}
+
+                <p className="text-sm text-gray-500 mb-4">{medicine.quantity}</p>
+
+                {medicine.notes && (
+                    <p className="text-xs text-gray-400 line-clamp-2 mb-4 italic">
+                        "{medicine.notes}"
+                    </p>
+                )}
+
+                <div className="mt-auto flex items-center gap-2 text-sm text-gray-600">
+                    <Clock size={14} className={status === 'expired' ? 'text-red-500' : 'text-gray-400'} />
+                    <span className={status === 'expired' ? 'font-bold text-red-600' : ''}>
+                        {formatExpiryDate(medicine.expiryDate)}
+                    </span>
                 </div>
-            )}
 
-            <p className="text-sm text-gray-500 mb-4">{medicine.quantity}</p>
+                {status === 'warning' && daysLeft !== null && (
+                    <div className="mt-2 text-xs text-orange-600 flex items-center gap-1 font-medium bg-orange-50 p-1 rounded">
+                        <AlertCircle size={12} /> {daysLeft} gün kaldı
+                    </div>
+                )}
+            </Card>
 
-            {medicine.notes && (
-                <p className="text-xs text-gray-400 line-clamp-2 mb-4 italic">
-                    "{medicine.notes}"
-                </p>
-            )}
-
-            <div className="mt-auto flex items-center gap-2 text-sm text-gray-600">
-                <Clock size={14} className={status === 'expired' ? 'text-red-500' : 'text-gray-400'} />
-                <span className={status === 'expired' ? 'font-bold text-red-600' : ''}>
-                    {formatExpiryDate(medicine.expiryDate)}
-                </span>
-            </div>
-
-            {status === 'warning' && daysLeft !== null && (
-                <div className="mt-2 text-xs text-orange-600 flex items-center gap-1 font-medium bg-orange-50 p-1 rounded">
-                    <AlertCircle size={12} /> {daysLeft} gün kaldı
-                </div>
-            )}
-        </Card>
+            <DeleteModal
+                isOpen={isDeleteModalOpen}
+                onClose={() => setIsDeleteModalOpen(false)}
+                medicine={medicine}
+                onConfirm={handleDeleteConfirm}
+            />
+        </>
     );
 };

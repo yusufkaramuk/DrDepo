@@ -144,15 +144,16 @@ function App() {
     setIsAddModalOpen(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Bu ilacı silmek istediğinize emin misiniz?")) return;
-
+  const handleDelete = async (id, idsToDelete = [id]) => {
     try {
       setSyncing(true);
       if (useCloud) {
-        await FirebaseService.deleteMedicine(id);
+        // Delete specified IDs from Firebase
+        for (const deleteId of idsToDelete) {
+          await FirebaseService.deleteMedicine(deleteId);
+        }
       }
-      setMedicines(prev => prev.filter(m => m.id !== id));
+      setMedicines(prev => prev.filter(m => !idsToDelete.includes(m.id)));
     } catch (error) {
       console.error("Delete error:", error);
       alert("Silme hatası: " + error.message);
@@ -177,7 +178,8 @@ function App() {
   };
 
   const filteredMedicines = useMemo(() => {
-    return medicines.filter(m => {
+    // First filter by search term
+    const filtered = medicines.filter(m => {
       const searchLower = searchTerm.toLowerCase();
       return (
         m.name.toLowerCase().includes(searchLower) ||
@@ -186,6 +188,41 @@ function App() {
         (m.activeIngredient3 && m.activeIngredient3.toLowerCase().includes(searchLower))
       );
     });
+
+    // Group duplicates (case-insensitive)
+    const grouped = [];
+    const processedIds = new Set();
+
+    filtered.forEach(medicine => {
+      if (processedIds.has(medicine.id)) return;
+
+      // Find all duplicates
+      const duplicates = filtered.filter(m => {
+        if (processedIds.has(m.id)) return false;
+
+        return (
+          m.name.toLowerCase() === medicine.name.toLowerCase() &&
+          (m.activeIngredient1 || '').toLowerCase() === (medicine.activeIngredient1 || '').toLowerCase() &&
+          (m.activeIngredient2 || '').toLowerCase() === (medicine.activeIngredient2 || '').toLowerCase() &&
+          (m.activeIngredient3 || '').toLowerCase() === (medicine.activeIngredient3 || '').toLowerCase() &&
+          (m.quantity || '').toLowerCase() === (medicine.quantity || '').toLowerCase() &&
+          m.expiryDate === medicine.expiryDate &&
+          (m.notes || '').toLowerCase() === (medicine.notes || '').toLowerCase()
+        );
+      });
+
+      // Mark all duplicates as processed
+      duplicates.forEach(d => processedIds.add(d.id));
+
+      // Add to grouped with count and all IDs
+      grouped.push({
+        ...medicine,
+        count: duplicates.length,
+        allIds: duplicates.map(d => d.id)
+      });
+    });
+
+    return grouped;
   }, [medicines, searchTerm]);
 
   return (

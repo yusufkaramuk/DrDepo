@@ -1,13 +1,13 @@
 import React from 'react';
 
 export const Button = ({ children, onClick, variant = 'primary', className = '', ...props }) => {
-    const baseStyle = "px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed";
+    const baseStyle = "flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed";
 
     const variants = {
-        primary: "bg-purple-600 text-white hover:bg-purple-700 shadow-lg shadow-purple-500/30",
-        secondary: "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50",
-        danger: "bg-red-500 text-white hover:bg-red-600 shadow-lg shadow-red-500/30",
-        ghost: "bg-transparent text-gray-600 hover:bg-gray-100"
+        primary: 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700 shadow-md hover:shadow-lg',
+        secondary: 'bg-gray-100 text-gray-700 hover:bg-gray-200',
+        ghost: 'text-gray-600 hover:bg-gray-100',
+        danger: 'bg-red-600 text-white hover:bg-red-700 shadow-md hover:shadow-lg'
     };
 
     return (
@@ -40,16 +40,11 @@ export const Card = ({ children, className = '' }) => (
 
 export const Badge = ({ children, variant = 'default', className = '' }) => {
     const variants = {
-        default: "bg-gray-100 text-gray-700",
-        success: "bg-green-100 text-green-700",
-        warning: "bg-orange-100 text-orange-700",
-        danger: "bg-red-100 text-red-700",
-        purple: "bg-purple-100 text-purple-700"
+        success: 'bg-green-100 text-green-700',
+        warning: 'bg-orange-100 text-orange-700',
+        danger: 'bg-red-100 text-red-700',
+        default: 'bg-gray-100 text-gray-700',
+        purple: 'bg-purple-100 text-purple-700'
     };
-
-    return (
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${variants[variant]} ${className}`}>
-            {children}
-        </span>
-    );
+    return <span className={`px-2 py-1 rounded-full text-xs font-medium ${variants[variant]} ${className}`}>{children}</span>;
 };
