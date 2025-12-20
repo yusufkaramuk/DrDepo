@@ -12,7 +12,7 @@ export const BulkAddModal = ({ isOpen, onClose, onSave }) => {
     };
 
     const removeRow = (index) => {
-        if (medicines.length === 1) return; // En az bir satır kalmalı
+        if (medicines.length === 1) return;
         setMedicines(medicines.filter((_, i) => i !== index));
     };
 
@@ -24,14 +24,13 @@ export const BulkAddModal = ({ isOpen, onClose, onSave }) => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        // Sadece isim dolu olanları kaydet
         const validMedicines = medicines.filter(m => m.name.trim() !== '');
         if (validMedicines.length === 0) {
             alert("En az bir ilaç adı girmelisiniz!");
             return;
         }
         onSave(validMedicines);
-        setMedicines([{ name: '', quantity: '', expiryDate: '', notes: '' }]); // Reset
+        setMedicines([{ name: '', quantity: '', expiryDate: '', notes: '' }]);
         onClose();
     };
 
@@ -70,8 +69,8 @@ export const BulkAddModal = ({ isOpen, onClose, onSave }) => {
                                             onChange={(e) => updateRow(index, 'quantity', e.target.value)}
                                         />
                                         <Input
-                                            type="date"
-                                            placeholder="Son Kullanma"
+                                            type="month"
+                                            placeholder="Ay/Yıl"
                                             value={med.expiryDate}
                                             onChange={(e) => updateRow(index, 'expiryDate', e.target.value)}
                                         />

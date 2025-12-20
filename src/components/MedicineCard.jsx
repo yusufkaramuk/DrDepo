@@ -3,21 +3,33 @@ import { Card, Button, Badge } from './ui/BaseComponents';
 import { Edit2, Trash2, AlertCircle, Clock } from 'lucide-react';
 
 export const MedicineCard = ({ medicine, onEdit, onDelete }) => {
-    const calculateDaysLeft = (dateStr) => {
+    // Calculate days/months until expiry
+    const calculateTimeLeft = (dateStr) => {
         if (!dateStr) return null;
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const expiry = new Date(dateStr);
-        const diffTime = expiry - today;
-        return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        // dateStr format: "2025-12" (YYYY-MM)
+        const [year, month] = dateStr.split('-').map(Number);
+
+        // Son kullanma tarihi = ayın son günü
+        const expiryDate = new Date(year, month, 0); // month index + 0 gives last day of previous month, so month gives last day of that month
+        expiryDate.setHours(23, 59, 59, 999);
+
+        const diffTime = expiryDate - today;
+        const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        return { daysLeft, expiryDate };
     };
 
-    const daysLeft = calculateDaysLeft(medicine.expiryDate);
+    const timeInfo = calculateTimeLeft(medicine.expiryDate);
+    const daysLeft = timeInfo?.daysLeft;
 
     let status = 'good';
     let badgeText = 'İyi Durumda';
 
-    if (daysLeft !== null) {
+    if (daysLeft !== null && daysLeft !== undefined) {
         if (daysLeft < 0) {
             status = 'expired';
             badgeText = 'Süresi Dolmuş';
@@ -33,6 +45,19 @@ export const MedicineCard = ({ medicine, onEdit, onDelete }) => {
             case 'warning': return 'warning';
             default: return 'success';
         }
+    };
+
+    // Format date as "Aralık 2025" (Turkish month + year)
+    const formatExpiryDate = (dateStr) => {
+        if (!dateStr) return 'Tarih Yok';
+
+        const [year, month] = dateStr.split('-');
+        const monthNames = [
+            'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+            'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+        ];
+
+        return `${monthNames[parseInt(month) - 1]} ${year}`;
     };
 
     return (
@@ -65,11 +90,11 @@ export const MedicineCard = ({ medicine, onEdit, onDelete }) => {
             <div className="mt-auto flex items-center gap-2 text-sm text-gray-600">
                 <Clock size={14} className={status === 'expired' ? 'text-red-500' : 'text-gray-400'} />
                 <span className={status === 'expired' ? 'font-bold text-red-600' : ''}>
-                    {medicine.expiryDate ? new Date(medicine.expiryDate).toLocaleDateString('tr-TR') : 'Tarih Yok'}
+                    {formatExpiryDate(medicine.expiryDate)}
                 </span>
             </div>
 
-            {status === 'warning' && (
+            {status === 'warning' && daysLeft !== null && (
                 <div className="mt-2 text-xs text-orange-600 flex items-center gap-1 font-medium bg-orange-50 p-1 rounded">
                     <AlertCircle size={12} /> {daysLeft} gün kaldı
                 </div>

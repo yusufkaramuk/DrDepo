@@ -67,8 +67,8 @@ export const AddMedicineModal = ({ isOpen, onClose, onSave, initialData, isEdit 
                             onChange={e => setFormData({ ...formData, quantity: e.target.value })}
                         />
                         <Input
-                            label="Son Kullanma Tarihi"
-                            type="date"
+                            label="Son Kullanma (Ay/Yıl)"
+                            type="month"
                             value={formData.expiryDate}
                             onChange={e => setFormData({ ...formData, expiryDate: e.target.value })}
                         />
