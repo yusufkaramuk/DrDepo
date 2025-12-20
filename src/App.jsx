@@ -177,9 +177,15 @@ function App() {
   };
 
   const filteredMedicines = useMemo(() => {
-    return medicines.filter(m =>
-      m.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    return medicines.filter(m => {
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        m.name.toLowerCase().includes(searchLower) ||
+        (m.activeIngredient1 && m.activeIngredient1.toLowerCase().includes(searchLower)) ||
+        (m.activeIngredient2 && m.activeIngredient2.toLowerCase().includes(searchLower)) ||
+        (m.activeIngredient3 && m.activeIngredient3.toLowerCase().includes(searchLower))
+      );
+    });
   }, [medicines, searchTerm]);
 
   return (
