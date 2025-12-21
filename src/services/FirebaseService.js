@@ -8,16 +8,23 @@ const db = getFirestore(app);
 
 const COLLECTION_NAME = 'medicines';
 
+// Helper to get user-specific collection path
+const getUserCollection = (userId) => {
+    if (!userId) throw new Error('User not authenticated');
+    return collection(db, `users/${userId}/${COLLECTION_NAME}`);
+};
+
 export const FirebaseService = {
-    // Get all medicines
-    getAllMedicines: async () => {
+    // Get all medicines for a specific user
+    getAllMedicines: async (userId) => {
         try {
-            const querySnapshot = await getDocs(collection(db, COLLECTION_NAME));
+            const userCollection = getUserCollection(userId);
+            const querySnapshot = await getDocs(userCollection);
             const medicines = [];
             querySnapshot.forEach((doc) => {
                 medicines.push({ id: doc.id, ...doc.data() });
             });
-            console.log(`[Firebase] Loaded ${medicines.length} medicines from Firestore`);
+            console.log(`[Firebase] Loaded ${medicines.length} medicines for user ${userId}`);
             return medicines;
         } catch (error) {
             console.error('[Firebase] Error getting medicines:', error);
@@ -25,10 +32,10 @@ export const FirebaseService = {
         }
     },
 
-    // Add a medicine
-    addMedicine: async (medicine) => {
+    // Add a medicine for a specific user
+    addMedicine: async (userId, medicine) => {
         try {
-            // Ensure we send plain object to Firestore
+            const userCollection = getUserCollection(userId);
             const medicineData = {
                 name: medicine.name || '',
                 quantity: medicine.quantity || '',
@@ -40,8 +47,8 @@ export const FirebaseService = {
                 createdAt: medicine.createdAt || new Date().toISOString()
             };
 
-            console.log('[Firebase] Adding medicine:', medicineData);
-            const docRef = await addDoc(collection(db, COLLECTION_NAME), medicineData);
+            console.log('[Firebase] Adding medicine for user:', userId);
+            const docRef = await addDoc(userCollection, medicineData);
             console.log('[Firebase] Medicine added with ID:', docRef.id);
             return { id: docRef.id, ...medicineData };
         } catch (error) {
@@ -51,9 +58,8 @@ export const FirebaseService = {
     },
 
     // Update a medicine
-    updateMedicine: async (id, updatedData) => {
+    updateMedicine: async (userId, id, updatedData) => {
         try {
-            // Clean the data to only include updatable fields
             const cleanData = {
                 name: updatedData.name || '',
                 quantity: updatedData.quantity || '',
@@ -64,7 +70,7 @@ export const FirebaseService = {
                 notes: updatedData.notes || ''
             };
 
-            const medicineRef = doc(db, COLLECTION_NAME, id);
+            const medicineRef = doc(db, `users/${userId}/${COLLECTION_NAME}`, id);
             await updateDoc(medicineRef, cleanData);
             console.log('[Firebase] Medicine updated:', id);
         } catch (error) {
@@ -74,9 +80,9 @@ export const FirebaseService = {
     },
 
     // Delete a medicine
-    deleteMedicine: async (id) => {
+    deleteMedicine: async (userId, id) => {
         try {
-            await deleteDoc(doc(db, COLLECTION_NAME, id));
+            await deleteDoc(doc(db, `users/${userId}/${COLLECTION_NAME}`, id));
             console.log('[Firebase] Medicine deleted:', id);
         } catch (error) {
             console.error('[Firebase] Error deleting medicine:', error);
@@ -85,8 +91,9 @@ export const FirebaseService = {
     },
 
     // Real-time listener for changes
-    subscribeMedicines: (callback) => {
-        const unsubscribe = onSnapshot(collection(db, COLLECTION_NAME), (snapshot) => {
+    subscribeMedicines: (userId, callback) => {
+        const userCollection = getUserCollection(userId);
+        const unsubscribe = onSnapshot(userCollection, (snapshot) => {
             const medicines = [];
             snapshot.forEach((doc) => {
                 medicines.push({ id: doc.id, ...doc.data() });

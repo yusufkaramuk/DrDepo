@@ -1,42 +1,79 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { fuzzyMatch } from './services/FuzzySearch';
-import { Plus, Search, Upload, Download, Package, PlusCircle, Cloud, HardDrive } from 'lucide-react';
+import { Plus, Search, Upload, Download, Package, PlusCircle, Cloud, HardDrive, LogOut, User } from 'lucide-react';
 import { Medicine } from './models/Medicine';
 import { StorageManager } from './services/StorageManager';
 import { FirebaseService } from './services/FirebaseService';
+import { AuthService } from './services/AuthService';
+import { fuzzyMatch } from './services/FuzzySearch';
 import { MedicineCard } from './components/MedicineCard';
 import { AddMedicineModal } from './components/AddMedicineModal';
 import { BulkAddModal } from './components/BulkAddModal';
+import { AuthModal } from './components/AuthModal';
 import { Button, Input, Badge } from './components/ui/BaseComponents';
 
 function App() {
   const [medicines, setMedicines] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState('date-desc'); // default: newest first
   const [loaded, setLoaded] = useState(false);
   const [useCloud, setUseCloud] = useState(true);
   const [syncing, setSyncing] = useState(false);
 
-  // Modal States
+  // Auth state
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+
+  // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isBulkAddModalOpen, setIsBulkAddModalOpen] = useState(false);
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [modalInitialData, setModalInitialData] = useState(null);
 
-  // Load data on mount
+  // Listen to auth state changes
   useEffect(() => {
-    loadData();
-  }, [useCloud]);
+    const unsubscribe = AuthService.onAuthStateChanged((currentUser) => {
+      console.log('[Auth] State changed:', currentUser?.email);
+      setUser(currentUser);
+      setAuthLoading(false);
 
-  const loadData = async () => {
+      // If user logged out, clear medicines
+      if (!currentUser) {
+        setMedicines([]);
+        setLoaded(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Load medicines when user is authenticated
+  useEffect(() => {
+    if (!user || !useCloud) return;
+
+    loadMedicines();
+  }, [user, useCloud]);
+
+  // Save to localStorage when medicines change (local mode)
+  useEffect(() => {
+    if (loaded && !useCloud) {
+      StorageManager.save(medicines);
+    }
+  }, [medicines, loaded, useCloud]);
+
+  const loadMedicines = async () => {
+    if (!user && useCloud) {
+      console.log('[App] No user, skipping cloud load');
+      return;
+    }
+
     try {
       setSyncing(true);
-      if (useCloud) {
-        // Load from Firebase
-        const data = await FirebaseService.getAllMedicines();
+      if (useCloud && user) {
+        const data = await FirebaseService.getAllMedicines(user.uid);
         console.log("Loaded from Firebase:", data);
         setMedicines(data);
       } else {
-        // Load from localStorage
         const data = StorageManager.load();
         console.log("Loaded from localStorage:", data);
         setMedicines(data);
@@ -44,44 +81,52 @@ function App() {
       setLoaded(true);
     } catch (error) {
       console.error("Load error:", error);
-      alert("Veri yükleme hatası: " + error.message);
-      // Fallback to localStorage
-      const data = StorageManager.load();
-      setMedicines(data);
-      setLoaded(true);
+      alert("Yükleme hatası: " + error.message);
     } finally {
       setSyncing(false);
     }
   };
 
-  // Save to localStorage (backup)
-  useEffect(() => {
-    if (loaded && !useCloud) {
-      console.log("Saving to localStorage:", medicines);
-      StorageManager.save(medicines);
+  const handleAuth = async (action, data) => {
+    try {
+      if (action === 'signup') {
+        await AuthService.signUp(data.email, data.password, data.displayName);
+      } else if (action === 'signin') {
+        await AuthService.signIn(data.email, data.password);
+      } else if (action === 'reset') {
+        await AuthService.resetPassword(data.email);
+      }
+    } catch (error) {
+      throw error;
     }
-  }, [medicines, loaded, useCloud]);
+  };
 
-  const handleAddMedicine = async (data) => {
+  const handleSignOut = async () => {
+    if (!window.confirm('Çıkış yapmak istediğinize emin misiniz?')) return;
+
+    try {
+      await AuthService.signOut();
+      setMedicines([]);
+      setLoaded(false);
+    } catch (error) {
+      alert('Çıkış yapılamadı: ' + error.message);
+    }
+  };
+
+  const handleSave = async (data) => {
     try {
       setSyncing(true);
       if (editingId) {
         // Update existing
-        if (useCloud) {
-          await FirebaseService.updateMedicine(editingId, data);
-          setMedicines(prev => prev.map(m =>
-            m.id === editingId ? { ...m, ...data } : m
-          ));
-        } else {
-          setMedicines(prev => prev.map(m =>
-            m.id === editingId ? { ...m, ...data } : m
-          ));
+        const updated = { ...data, id: editingId };
+        if (useCloud && user) {
+          await FirebaseService.updateMedicine(user.uid, editingId, data);
         }
-        setEditingId(null);
+        setMedicines(prev => prev.map(m => m.id === editingId ? updated : m));
       } else {
         // Add new
-        if (useCloud) {
-          const newMed = await FirebaseService.addMedicine(data);
+        if (useCloud && user) {
+          const newMed = await FirebaseService.addMedicine(user.uid, data);
           setMedicines(prev => [newMed, ...prev]);
         } else {
           const newMedicine = new Medicine(
@@ -97,7 +142,6 @@ function App() {
           setMedicines(prev => [newMedicine, ...prev]);
         }
       }
-      setModalInitialData(null);
     } catch (error) {
       console.error("Save error:", error);
       alert("Kaydetme hatası: " + error.message);
@@ -109,10 +153,10 @@ function App() {
   const handleBulkAdd = async (medicinesData) => {
     try {
       setSyncing(true);
-      if (useCloud) {
+      if (useCloud && user) {
         const addedMedicines = [];
         for (const data of medicinesData) {
-          const newMed = await FirebaseService.addMedicine(data);
+          const newMed = await FirebaseService.addMedicine(user.uid, data);
           addedMedicines.push(newMed);
         }
         setMedicines(prev => [...addedMedicines, ...prev]);
@@ -148,10 +192,9 @@ function App() {
   const handleDelete = async (id, idsToDelete = [id]) => {
     try {
       setSyncing(true);
-      if (useCloud) {
-        // Delete specified IDs from Firebase
+      if (useCloud && user) {
         for (const deleteId of idsToDelete) {
-          await FirebaseService.deleteMedicine(deleteId);
+          await FirebaseService.deleteMedicine(user.uid, deleteId);
         }
       }
       setMedicines(prev => prev.filter(m => !idsToDelete.includes(m.id)));
@@ -163,33 +206,69 @@ function App() {
     }
   };
 
+  const handleExport = () => {
+    StorageManager.exportToJSON(medicines);
+  };
+
   const handleImport = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
     try {
+      setSyncing(true);
       const data = await StorageManager.importFromJSON(file);
+
       if (Array.isArray(data)) {
-        setMedicines(data);
-        alert("Veriler başarıyla yüklendi!");
+        if (useCloud && user) {
+          // Upload all medicines to Firebase
+          const uploadedMedicines = [];
+          for (const medicine of data) {
+            const newMed = await FirebaseService.addMedicine(user.uid, medicine);
+            uploadedMedicines.push(newMed);
+          }
+          setMedicines(uploadedMedicines);
+          alert(`${uploadedMedicines.length} ilaç başarıyla Firebase'e yüklendi!`);
+        } else {
+          // Just set to localStorage
+          setMedicines(data);
+          alert("Veriler başarıyla yüklendi!");
+        }
       }
     } catch (err) {
       alert("Hata: " + err.message);
+    } finally {
+      setSyncing(false);
     }
     e.target.value = null;
   };
 
+  const toggleCloudMode = async () => {
+    if (!user && !useCloud) {
+      alert('Bulut moda geçmek için giriş yapmalısınız');
+      setShowAuthModal(true);
+      return;
+    }
+
+    const newMode = !useCloud;
+    setUseCloud(newMode);
+    setLoaded(false);
+
+    if (newMode && user) {
+      await loadMedicines();
+    } else if (!newMode) {
+      const localData = StorageManager.load();
+      setMedicines(localData);
+      setLoaded(true);
+    }
+  };
+
   const filteredMedicines = useMemo(() => {
-    // First filter by search term with fuzzy matching
     const filtered = medicines.filter(m => {
       const searchLower = searchTerm.toLowerCase().trim();
 
-      // If search is empty, show all
       if (!searchLower) return true;
 
-      // Check name with fuzzy match
       if (fuzzyMatch(searchLower, m.name)) return true;
-
-      // Check active ingredients with fuzzy match
       if (m.activeIngredient1 && fuzzyMatch(searchLower, m.activeIngredient1)) return true;
       if (m.activeIngredient2 && fuzzyMatch(searchLower, m.activeIngredient2)) return true;
       if (m.activeIngredient3 && fuzzyMatch(searchLower, m.activeIngredient3)) return true;
@@ -197,14 +276,12 @@ function App() {
       return false;
     });
 
-    // Group duplicates (case-insensitive)
     const grouped = [];
     const processedIds = new Set();
 
     filtered.forEach(medicine => {
       if (processedIds.has(medicine.id)) return;
 
-      // Find all duplicates
       const duplicates = filtered.filter(m => {
         if (processedIds.has(m.id)) return false;
 
@@ -219,10 +296,8 @@ function App() {
         );
       });
 
-      // Mark all duplicates as processed
       duplicates.forEach(d => processedIds.add(d.id));
 
-      // Add to grouped with count and all IDs
       grouped.push({
         ...medicine,
         count: duplicates.length,
@@ -230,50 +305,107 @@ function App() {
       });
     });
 
-    return grouped;
-  }, [medicines, searchTerm]);
+    // Apply sorting
+    const sorted = [...grouped].sort((a, b) => {
+      switch (sortBy) {
+        case 'name-asc':
+          return a.name.localeCompare(b.name, 'tr');
+        case 'name-desc':
+          return b.name.localeCompare(a.name, 'tr');
+        case 'expiry-asc':
+          if (!a.expiryDate) return 1;
+          if (!b.expiryDate) return -1;
+          return a.expiryDate.localeCompare(b.expiryDate);
+        case 'expiry-desc':
+          if (!a.expiryDate) return 1;
+          if (!b.expiryDate) return -1;
+          return b.expiryDate.localeCompare(a.expiryDate);
+        case 'count-asc':
+          return a.count - b.count;
+        case 'count-desc':
+          return b.count - a.count;
+        case 'date-asc':
+          return (a.createdAt || '').localeCompare(b.createdAt || '');
+        case 'date-desc':
+        default:
+          return (b.createdAt || '').localeCompare(a.createdAt || '');
+      }
+    });
+
+    return sorted;
+  }, [medicines, searchTerm, sortBy]);
+
+  // Show loading screen
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show auth modal if not logged in
+  if (!user) {
+    return (
+      <>
+        <div className="min-h-screen bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-600 flex items-center justify-center p-4">
+          <div className="text-center text-white">
+            <Package size={64} className="mx-auto mb-4" />
+            <h1 className="text-4xl font-bold mb-2">İlaç Stok Takip Sistemi</h1>
+            <p className="text-lg mb-8 opacity-90">Evinizdeki ilaçları dijital ortamda takip edin</p>
+            <Button onClick={() => setShowAuthModal(true)} className="bg-white text-purple-600 hover:bg-gray-100">
+              Giriş Yap / Kayıt Ol
+            </Button>
+          </div>
+        </div>
+        <AuthModal
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          onAuth={handleAuth}
+        />
+      </>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* Header */}
       <header className="bg-gradient-to-r from-purple-700 to-indigo-800 text-white shadow-lg sticky top-0 z-30">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="bg-white/20 p-2 rounded-lg">
-                <Package size={28} />
-              </div>
+              <Package size={32} />
               <div>
-                <h1 className="text-2xl font-bold tracking-tight">İlaç Stok Takip</h1>
-                <div className="flex items-center gap-2 mt-1">
-                  {syncing ? (
-                    <Badge variant="default" className="text-xs animate-pulse">Senkronize ediliyor...</Badge>
-                  ) : (
-                    <Badge variant={useCloud ? "success" : "default"} className="text-xs">
-                      {useCloud ? <><Cloud size={12} className="mr-1" /> Bulut</> : <><HardDrive size={12} className="mr-1" /> Yerel</>}
-                    </Badge>
-                  )}
-                </div>
+                <h1 className="text-2xl font-bold">İlaç Stok Takip</h1>
+                <p className="text-sm text-purple-200">
+                  {filteredMedicines.length} ilaç • {user.displayName || user.email}
+                </p>
               </div>
             </div>
 
-            <div className="flex gap-2 w-full md:w-auto">
-              <div className="relative flex-1 md:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                <input
-                  type="text"
-                  placeholder="İlaç ara..."
-                  className="w-full pl-10 pr-4 py-2 rounded-full bg-white/10 border border-white/20 text-white placeholder-purple-200 focus:outline-none focus:bg-white/20 transition-all"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
+            <div className="flex items-center gap-2">
+              <Badge variant={syncing ? 'warning' : useCloud ? 'success' : 'default'}>
+                {syncing ? 'Senkronize ediliyor...' : useCloud ? 'Bulut' : 'Yerel'}
+              </Badge>
+
               <button
-                onClick={() => setUseCloud(!useCloud)}
-                className="px-3 py-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors text-sm whitespace-nowrap"
+                onClick={toggleCloudMode}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
                 title={useCloud ? "Yerel Depolamaya Geç" : "Bulut Depolamaya Geç"}
               >
                 {useCloud ? <HardDrive size={18} /> : <Cloud size={18} />}
+              </button>
+
+              <button
+                onClick={handleSignOut}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors flex items-center gap-2"
+                title="Çıkış Yap"
+              >
+                <LogOut size={18} />
+                <span className="hidden md:inline text-sm">Çıkış</span>
               </button>
             </div>
           </div>
@@ -287,44 +419,84 @@ function App() {
             <Button onClick={() => { setEditingId(null); setModalInitialData(null); setIsAddModalOpen(true); }}>
               <Plus size={20} /> Tek İlaç Ekle
             </Button>
-            <Button variant="secondary" onClick={() => setIsBulkAddModalOpen(true)}>
-              <PlusCircle size={20} className="text-purple-600" /> Toplu Ekle
+            <Button onClick={() => setIsBulkModalOpen(true)} variant="secondary">
+              <PlusCircle size={20} /> Toplu Ekle
             </Button>
           </div>
 
           <div className="flex gap-2">
-            <input type="file" id="json-upload" className="hidden" accept=".json" onChange={handleImport} />
-            <Button variant="ghost" onClick={() => document.getElementById('json-upload').click()} title="Yedekten Yükle">
-              <Upload size={20} />
+            <Button onClick={handleExport} variant="secondary">
+              <Download size={18} /> Dışa Aktar
             </Button>
-            <Button variant="ghost" onClick={() => StorageManager.exportToJSON(medicines)} title="Yedeği İndir">
-              <Download size={20} />
-            </Button>
+            <label className="cursor-pointer">
+              <div className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 bg-gray-100 text-gray-700 hover:bg-gray-200">
+                <Upload size={18} /> İçe Aktar
+              </div>
+              <input type="file" accept=".json" onChange={handleImport} className="hidden" />
+            </label>
           </div>
         </div>
 
-        {/* Content */}
-        {medicines.length === 0 ? (
-          <div className="text-center py-20 text-gray-400">
-            <Package size={64} className="mx-auto mb-4 opacity-20" />
-            <p className="text-xl">Henüz ilaç eklenmemiş.</p>
-            <p className="text-sm">"Tek İlaç Ekle" veya "Toplu Ekle" butonunu kullanarak başlayın.</p>
+        {/* Search and Sort Bar */}
+        <div className="mb-6 space-y-3">
+          {/* Sort Dropdown */}
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
+              Sırala:
+            </label>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="px-3 py-2 rounded-lg border border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all bg-white"
+            >
+              <option value="date-desc">🕐 En Yeni Önce</option>
+              <option value="date-asc">🕐 En Eski Önce</option>
+              <option value="name-asc">🔤 A → Z</option>
+              <option value="name-desc">🔤 Z → A</option>
+              <option value="expiry-asc">📅 Yakında Bitecekler</option>
+              <option value="expiry-desc">📅 Uzun Süreliler</option>
+              <option value="count-desc">📦 Çok Olanlar Önce</option>
+              <option value="count-asc">📦 Az Olanlar Önce</option>
+            </select>
+            <span className="text-xs text-gray-500">
+              ({filteredMedicines.length} ilaç)
+            </span>
+          </div>
+
+          {/* Search Bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+            <input
+              type="text"
+              placeholder="İlaç ara (fuzzy search: yanlış yazımlar da bulunur)"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all"
+            />
+          </div>
+        </div>
+
+        {/* Medicines Grid */}
+        {filteredMedicines.length === 0 ? (
+          <div className="text-center py-16">
+            <Package size={64} className="mx-auto text-gray-300 mb-4" />
+            <h3 className="text-xl font-semibold text-gray-600 mb-2">
+              {searchTerm ? 'İlaç bulunamadı' : 'Henüz ilaç eklenmemiş'}
+            </h3>
+            <p className="text-gray-500 mb-6">
+              {searchTerm ? 'Farklı bir arama terimi deneyin' : 'İlaç eklemek için yukarıdaki butonları kullanın'}
+            </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredMedicines.map(med => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filteredMedicines.map(medicine => (
               <MedicineCard
-                key={med.id}
-                medicine={med}
+                key={medicine.id}
+                medicine={medicine}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
               />
             ))}
-            {filteredMedicines.length === 0 && (
-              <div className="col-span-full text-center py-10 text-gray-400">
-                Aranan kriterlere uygun ilaç bulunamadı.
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -332,15 +504,19 @@ function App() {
       {/* Modals */}
       <AddMedicineModal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        onSave={handleAddMedicine}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setEditingId(null);
+          setModalInitialData(null);
+        }}
+        onSave={handleSave}
         initialData={modalInitialData}
         isEdit={!!editingId}
       />
 
       <BulkAddModal
-        isOpen={isBulkAddModalOpen}
-        onClose={() => setIsBulkAddModalOpen(false)}
+        isOpen={isBulkModalOpen}
+        onClose={() => setIsBulkModalOpen(false)}
         onSave={handleBulkAdd}
       />
     </div>

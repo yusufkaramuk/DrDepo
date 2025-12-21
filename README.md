@@ -1,18 +1,32 @@
 # İlaç Stok Takip Sistemi 💊
 
-Modern, kullanıcı dostu ve akıllı bir web uygulaması. Evinizdeki ilaçları dijital ortamda takip edin, son kullanma tarihlerini kontrol edin ve stok yönetiminizi kolaylaştırın.
+Modern, kullanıcı dostu ve güvenli bir web uygulaması. Evinizdeki ilaçları dijital ortamda takip edin, son kullanma tarihlerini kontrol edin ve stok yönetiminizi kolaylaştırın.
+
+**🌐 Canlı Demo:** [https://ilac-stok-takip.web.app](https://ilac-stok-takip.web.app)
 
 ## ✨ Özellikler
+
+### 🔐 Güvenli Kullanıcı Yönetimi
+- **Firebase Authentication**: E-posta/şifre ile güvenli giriş
+- **Kullanıcı İzolasyonu**: Her kullanıcı sadece kendi verilerini görür
+- **Şifre Sıfırlama**: E-posta ile şifre kurtarma
+- **Oturum Yönetimi**: Güvenli giriş/çıkış
 
 ### 📝 İlaç Yönetimi
 - **CRUD İşlemleri**: İlaç ekleme, düzenleme, silme ve listeleme
 - **Etken Madde Takibi**: Her ilaç için 3 farklı etken madde kaydı
 - **Akıllı Gruplama**: Aynı bilgilere sahip ilaçlar otomatik gruplanır (x2, x3 gösterimi)
 - **Toplu Ekleme**: Birden fazla ilacı tek seferde ekleyin
+- **Gelişmiş Silme**: Grup ilaçlarından istediğiniz kadarını silin
 
-### 🔍 Akıllı Arama
+### 🔍 Akıllı Arama ve Sıralama
 - **Fuzzy Search**: Yanlış yazımlara toleranslı arama (Levenshtein algoritması)
 - **Çoklu Alan Araması**: İlaç adı ve tüm etken maddelerde arama
+- **Gelişmiş Sıralama**: 8 farklı sıralama seçeneği
+  - 🕐 Tarih bazlı (En yeni/eski)
+  - 🔤 Alfabetik (A-Z, Z-A)
+  - 📅 Son kullanma tarihi (Yakında bitecek/uzun süreliler)
+  - 📦 Kopya sayısı (Çok/az olanlar)
 - **Gerçek Zamanlı Filtreleme**: Yazdıkça sonuçları görün
 
 ### ⏰ Son Kullanma Takibi
@@ -22,46 +36,46 @@ Modern, kullanıcı dostu ve akıllı bir web uygulaması. Evinizdeki ilaçları
   - 🟢 İyi durumda olanlar (yeşil)
 - **Ay/Yıl Formatı**: Pratik tarih girişi
 - **Gün Sayacı**: Yakında bitecek ilaçlar için kalan gün gösterimi
-
-### 🗑️ Gelişmiş Silme
-- **Akıllı Modal**: Kaç tane silmek istediğinizi seçin
-- **Toplu Silme**: Tüm kopyaları tek seferde silin
-- **Güvenli Onay**: İstemeden silmeyi önleyen onay sistemi
+- **Türkçe Tarih**: "Aralık 2025" formatında gösterim
 
 ### ☁️ Bulut Senkronizasyonu
 - **Firebase Firestore**: Gerçek zamanlı veri senkronizasyonu
 - **Çoklu Cihaz Desteği**: Telefon, tablet, bilgisayar - her yerden erişim
+- **Kullanıcı Bazlı Veri**: Her kullanıcının verileri izole
 - **LocalStorage Yedekleme**: Offline çalışma desteği
 - **Otomatik Geçiş**: Bulut/Yerel mod arası kolay geçiş
 
 ### 💾 Veri Yönetimi
 - **JSON Export**: Verilerinizi yedekleyin
 - **JSON Import**: Önceki yedeklerden geri yükleyin
+- **Firebase Import**: JSON'dan Firebase'e toplu aktarım
 - **Otomatik Kaydetme**: Her değişiklik anında kaydedilir
 
 ### 📱 Progressive Web App (PWA)
 - **Ana Ekrana Ekleme**: Telefonda uygulama gibi çalışır
 - **Offline Çalışma**: İnternet olmadan kullanılabilir
-- **Push Bildirimleri**: (Gelecek güncellemede)
+- **Network-First Caching**: Her zaman güncel versiyon
 - **Responsive Tasarım**: Mobil ve masaüstü uyumlu
+- **Install Prompt**: Kolay kurulum
 
 ### 🎨 Modern Arayüz
 - **Mor Gradient Tema**: Şık ve profesyonel tasarım
 - **Pill Badge'ler**: Etken maddeleri görsel gösterim
 - **Smooth Animasyonlar**: Akıcı geçişler ve efektler
-- **Dark Mode Hazır**: (Gelecek güncellemede)
+- **Accessibility**: Erişilebilir tasarım
+- **Türkçe UI**: Tam Türkçe arayüz
 
 ## 🚀 Hızlı Başlangıç
 
 ### Ön Gereksinimler
-- Node.js 18+ ve npm yüklü olmalı
+- Node.js 18+ ve npm
 - Firebase hesabı (ücretsiz)
 
 ### Kurulum
 
 1. **Projeyi Klonlayın**
 ```bash
-git clone https://github.com/KULLANICI_ADI/ilacStokTakipSistemi.git
+git clone https://github.com/yusufkaramuk/ilacStokTakipSistemi.git
 cd ilacStokTakipSistemi
 ```
 
@@ -87,23 +101,10 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
 VITE_FIREBASE_APP_ID=your_app_id
 ```
 
-Firebase kurulum detayları için: [FIREBASE_SETUP.md](FIREBASE_SETUP.md)
+4. **Firebase Kurulumu**
 
-4. **Firestore Database'i Aktifleştirin**
-
-Firebase Console → Firestore Database → **Test Mode** ile başlatın
-
-Güvenlik kuralları (Firebase Console → Firestore → Rules):
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
-    }
-  }
-}
-```
+- [FIREBASE_SETUP.md](FIREBASE_SETUP.md) - Firebase proje kurulumu
+- [AUTHENTICATION_SETUP.md](AUTHENTICATION_SETUP.md) - Authentication aktifleştirme
 
 5. **Uygulamayı Başlatın**
 ```bash
@@ -112,33 +113,19 @@ npm run dev
 
 Tarayıcınızda `http://localhost:5173` adresini açın.
 
-## 📱 Telefonda Kullanım
+## 📱 Deployment
 
-### Seçenek 1: Deployment (Önerilen)
-
-**Firebase Hosting ile internete yükleyin:**
+### Firebase Hosting (Önerilen)
 
 ```bash
-npm install -g firebase-tools
-firebase login
+# Build
 npm run build
-firebase init hosting
+
+# Deploy
 firebase deploy
 ```
 
 Detaylı talimatlar: [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)
-
-### Seçenek 2: Yerel Ağ
-
-Aynı WiFi'deki cihazlardan erişim:
-
-```bash
-npm run dev
-```
-
-Network URL'sini (örn: `http://192.168.0.174:5173`) telefonda açın.
-
-Detaylar: [NETWORK_ACCESS.md](NETWORK_ACCESS.md)
 
 ## 🛠️ Teknolojiler
 
@@ -148,15 +135,17 @@ Detaylar: [NETWORK_ACCESS.md](NETWORK_ACCESS.md)
 - **Tailwind CSS** - Utility-first CSS
 
 ### Backend & Database
+- **Firebase Authentication** - Kullanıcı yönetimi
 - **Firebase Firestore** - NoSQL cloud database
 - **Firebase Hosting** - Static web hosting
 
-### Libraries
+### Algorithms & Libraries
 - **Lucide React** - İkonlar
-- **Levenshtein Algorithm** - Fuzzy search
+- **Levenshtein Distance** - Fuzzy search algoritması
+- **LocalStorage API** - Offline storage
 
 ### PWA
-- **Service Workers** - Offline support
+- **Service Workers** - Network-first caching
 - **Web App Manifest** - App-like experience
 
 ## 📂 Proje Yapısı
@@ -165,14 +154,15 @@ Detaylar: [NETWORK_ACCESS.md](NETWORK_ACCESS.md)
 ilacStokTakipSistemi/
 ├── public/
 │   ├── manifest.json          # PWA manifest
-│   ├── sw.js                  # Service Worker
-│   ├── icon-192.png           # App icon (192x192)
-│   └── icon-512.png           # App icon (512x512)
+│   ├── sw.js                  # Service Worker (network-first)
+│   ├── icon-192.png           # App icon
+│   └── icon-512.png           # App icon
 ├── src/
 │   ├── components/
 │   │   ├── ui/
 │   │   │   └── BaseComponents.jsx   # Button, Input, Badge, Card
 │   │   ├── AddMedicineModal.jsx     # Tek ilaç ekleme
+│   │   ├── AuthModal.jsx            # Giriş/Kayıt modal
 │   │   ├── BulkAddModal.jsx         # Toplu ilaç ekleme
 │   │   ├── DeleteModal.jsx          # Silme onay modal
 │   │   └── MedicineCard.jsx         # İlaç kartı
@@ -181,9 +171,10 @@ ilacStokTakipSistemi/
 │   ├── models/
 │   │   └── Medicine.js              # İlaç modeli
 │   ├── services/
+│   │   ├── AuthService.js           # Firebase Auth
 │   │   ├── FirebaseService.js       # Firestore CRUD
-│   │   ├── StorageManager.js        # LocalStorage
-│   │   └── FuzzySearch.js           # Arama algoritması
+│   │   ├── FuzzySearch.js           # Arama algoritması
+│   │   └── StorageManager.js        # LocalStorage
 │   ├── App.jsx                      # Ana uygulama
 │   ├── main.jsx                     # Entry point
 │   └── index.css                    # Global styles
@@ -194,31 +185,36 @@ ilacStokTakipSistemi/
 ├── firestore.rules                  # Güvenlik kuralları
 ├── index.html                       # HTML şablonu
 ├── package.json                     # Bağımlılıklar
-├── tailwind.config.js               # Tailwind config
-├── vite.config.js                   # Vite config
+├── AUTHENTICATION_SETUP.md          # Auth kurulum
 ├── DEPLOYMENT_GUIDE.md              # Deployment talimatları
 ├── FIREBASE_SETUP.md                # Firebase kurulum
-├── NETWORK_ACCESS.md                # Ağ erişimi
 └── README.md                        # Bu dosya
 ```
 
-## 🎯 Kullanım Örnekleri
+## 🎯 Kullanım
 
 ### İlaç Ekleme
-1. **Tek İlaç**: "Tek İlaç Ekle" butonuna tıklayın
-2. **Toplu**: "Toplu Ekle" ile birden fazla ilaç ekleyin
-3. Form alanları:
+1. **"Tek İlaç Ekle"** veya **"Toplu Ekle"** butonuna tıklayın
+2. Form alanlarını doldurun:
    - İlaç Adı (zorunlu)
    - Etken Madde 1, 2, 3 (opsiyonel)
    - Miktar (örn: 500mg, 1 kutu)
    - Son Kullanma (Ay/Yıl)
    - Notlar
+3. **"Kaydet"**
+
+### Sıralama
+Dropdown'dan seçim yapın:
+- 🕐 Tarih bazlı
+- 🔤 Alfabetik
+- 📅 Son kullanma tarihi
+- 📦 Kopya sayısı
 
 ### Arama
 ```
-Arama: "parol"      → Parol bulunur
-Arama: "paral"      → Parol bulunur (fuzzy match)
-Arama: "parasetamol" → Parasetamol içeren tüm ilaçlar
+"parol"      → Parol bulunur
+"paral"      → Parol bulunur (fuzzy match)
+"parasetamol" → Parasetamol içeren tüm ilaçlar
 ```
 
 ### Silme
@@ -226,29 +222,26 @@ Arama: "parasetamol" → Parasetamol içeren tüm ilaçlar
 2. **Tek ilaç**: "Silmek için Onayla"
 3. **Birden fazla**: Kaç tane silmek istediğinizi girin veya "Tümünü Sil"
 
-### Veri Yedekleme
-1. **Export**: İndirme ikonu → JSON dosyası indirilir
-2. **Import**: Yükleme ikonu → JSON dosyası seçin
-
 ## 🔒 Güvenlik
 
-### Geliştirme Ortamı
+### Geliştirme
 - `.env` dosyası **asla** GitHub'a yüklenmez
 - `.gitignore` ile korunur
 - Her geliştirici kendi Firebase credentials'ını kullanır
 
 ### Production
-- Firestore Security Rules ile veri koruması
-- HTTPS zorunlu (Firebase Hosting otomatik)
-- API Key kısıtlamaları (Firebase Console)
+- **Firestore Security Rules**: User-based data isolation
+- **HTTPS**: Firebase Hosting otomatik
+- **Authentication**: Email/password güvenli hash
+- **API Key Restrictions**: Firebase Console'da ayarlanabilir
 
-### Önerilen Güvenlik Kuralları (Gelecek)
+### Firestore Rules
 ```javascript
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /medicines/{medicineId} {
-      allow read, write: if request.auth != null;
+    match /users/{userId}/medicines/{medicineId} {
+      allow read, write: if request.auth.uid == userId;
     }
   }
 }
@@ -266,8 +259,8 @@ service cloud.firestore {
 
 - ⚡ **Lighthouse Score**: 95+
 - 🚀 **First Contentful Paint**: < 1s
-- 📦 **Bundle Size**: ~200KB (gzipped)
-- 💾 **Offline Ready**: Service Worker cache
+- 📦 **Bundle Size**: ~520KB (gzipped: ~160KB)
+- 💾 **Network-First**: Her zaman güncel
 
 ## 🤝 Katkıda Bulunma
 
@@ -279,31 +272,36 @@ service cloud.firestore {
 
 ## 📝 Changelog
 
+### v2.1.0 (2025-01-21)
+- ✨ **Gelişmiş Sıralama**: 8 farklı sıralama seçeneği
+- ✨ **Firebase Authentication**: Güvenli kullanıcı yönetimi
+- ✨ **User-Based Data**: Veri izolasyonu
+- ✨ **Gelişmiş Silme Modal**: Esnek silme seçenekleri
+- 🔧 **Service Worker**: Network-first caching
+- 🎨 **UI İyileştirmeleri**: Header göstergeleri
+
 ### v2.0.0 (2025-01)
-- ✨ PWA desteği
-- ✨ Fuzzy search
-- ✨ Etken madde alanları (3x)
-- ✨ Toplu ekleme
-- ✨ Akıllı gruplama
-- ✨ Gelişmiş silme modal
-- 🔧 Firebase entegrasyonu
-- 🎨 UI iyileştirmeleri
+- ✨ **PWA desteği**
+- ✨ **Fuzzy search**
+- ✨ **Etken madde alanları** (3x)
+- ✨ **Toplu ekleme**
+- ✨ **Akıllı gruplama**
+- 🔧 **Firebase entegrasyonu**
 
 ### v1.0.0 (2024-12)
 - 🎉 İlk sürüm
 - ✅ Temel CRUD işlemleri
 - ✅ LocalStorage
-- ✅ Export/Import
 
 ## 📄 Lisans
 
-Bu proje MIT lisansı altında lisanslanmıştır. Detaylar için [LICENSE](LICENSE) dosyasına bakın.
+Bu proje MIT lisansı altında lisanslanmıştır.
 
 ## 📧 İletişim
 
-Sorularınız için issue açabilirsiniz veya:
-- Email: iletisim@yusufkaramuk.com.tr
-- GitHub: [@yusufkaramuk](https://github.com/yusufkaramuk)
+- **Geliştirici**: Yusuf Karamuk
+- **Email**: yusufkaramuk10@gmail.com
+- **GitHub**: [@yusufkaramuk](https://github.com/yusufkaramuk)
 
 ## 🙏 Teşekkürler
 
@@ -315,6 +313,8 @@ Sorularınız için issue açabilirsiniz veya:
 
 ---
 
-**Not:** Bu proje ev kullanımı için geliştirilmiştir. Ticari kullanım veya hassas sağlık verileri için ek güvenlik önlemleri almanız önerilir.
+**Not:** Bu proje ev kullanımı ve eğitim amaçlıdır. Ticari kullanım veya hassas sağlık verileri için ek güvenlik önlemleri almanız önerilir.
 
 ⭐ Projeyi beğendiyseniz yıldız vermeyi unutmayın!
+
+**🌐 Demo:** [https://ilac-stok-takip.web.app](https://ilac-stok-takip.web.app)
