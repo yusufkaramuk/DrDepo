@@ -272,7 +272,7 @@ service cloud.firestore {
 
 ## 📝 Changelog
 
-### v2.1.0 (2025-01-21)
+### v2.1.0 (2025-12-21) 🆕
 - ✨ **Gelişmiş Sıralama**: 8 farklı sıralama seçeneği
 - ✨ **Firebase Authentication**: Güvenli kullanıcı yönetimi
 - ✨ **User-Based Data**: Veri izolasyonu
@@ -280,18 +280,53 @@ service cloud.firestore {
 - 🔧 **Service Worker**: Network-first caching
 - 🎨 **UI İyileştirmeleri**: Header göstergeleri
 
-### v2.0.0 (2025-01)
-- ✨ **PWA desteği**
-- ✨ **Fuzzy search**
-- ✨ **Etken madde alanları** (3x)
-- ✨ **Toplu ekleme**
-- ✨ **Akıllı gruplama**
-- 🔧 **Firebase entegrasyonu**
+### v2.0.1 (2025-12-21)
+- 🐛 **Bug Fixes**: Firebase import hatası düzeltildi
+- 🔧 **Performance**: Build optimizasyonları
+- 📱 **PWA**: Service worker cache iyileştirmeleri
 
-### v1.0.0 (2024-12)
-- 🎉 İlk sürüm
-- ✅ Temel CRUD işlemleri
-- ✅ LocalStorage
+### v2.0.0 (2025-12-21)
+- ✨ **PWA Desteği**: Progressive Web App özellikleri
+- ✨ **Fuzzy Search**: Yanlış yazımlara toleranslı arama
+- ✨ **Etken Madde Alanları**: 3 etken madde kaydı
+- ✨ **Toplu Ekleme**: Birden fazla ilaç ekleme
+- ✨ **Akıllı Gruplama**: Aynı ilaçları gruplama (x2, x3)
+- 🔧 **Firebase Entegrasyonu**: Bulut senkronizasyonu
+
+### v1.3.0 (2025-12-21)
+- ✨ **Ay/Yıl Formatı**: Son kullanma tarihi basitleştirildi
+- ✨ **Türkçe Tarih**: "Aralık 2025" formatı
+- 🎨 **UI İyileştirmeleri**: Tarih gösterimi ve badge'ler
+- 🔧 **Export/Import**: JSON veri aktarımı
+
+### v1.2.0 (2025-12-21)
+- ✨ **Firebase Cloud**: Gerçek zamanlı senkronizasyon
+- ✨ **Bulut/Yerel Mod**: Kolay geçiş sistemi
+- 🔧 **LocalStorage**: Offline yedekleme
+- 🎨 **Status Badge**: Bulut/Yerel göstergesi
+
+### v1.1.2 (2025-12-21)
+- 🐛 **Bug Fixes**: LocalStorage hataları düzeltildi
+- 🔧 **Performance**: Liste render optimizasyonu
+- 📱 **Mobile**: Responsive tasarım iyileştirmeleri
+
+### v1.1.1 (2025-12-21)
+- 🐛 **Bug Fixes**: Son kullanma tarihi hesaplama hatası
+- 🎨 **UI Polish**: Renk şeması iyileştirmeleri
+- 🔧 **Code Cleanup**: Kod optimizasyonları
+
+### v1.0.1 (2025-12-21)
+- 🐛 **Bug Fixes**: İlk kullanım hataları
+- 📝 **Documentation**: README ve kurulum rehberi
+- 🔧 **Dependencies**: Bağımlılık güncellemeleri
+
+### v1.0.0 (2025-12-21) 🎉
+- 🎉 **İlk Sürüm**
+- ✅ **CRUD İşlemleri**: Temel ilaç yönetimi
+- ✅ **LocalStorage**: Yerel veri saklama
+- ✅ **Son Kullanma Takibi**: Otomatik uyarılar
+- ✅ **Arama**: Basit filtreleme
+- ✅ **Tailwind CSS**: Modern tasarım
 
 ## 📄 Lisans
 
