@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pencil, Trash2, Calendar, Clock, Droplets, History } from 'lucide-react';
+import { Pencil, Trash2, Calendar, Clock, Droplets, History, Share2 } from 'lucide-react';
 
 const TR_MONTHS = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
 
@@ -42,7 +42,7 @@ const StatusPill = ({ status, daysLeft }) => {
   );
 };
 
-export const MedicineCard = ({ medicine, onEdit, onDelete, onHistory }) => {
+export const MedicineCard = ({ medicine, onEdit, onDelete, onHistory, onShare }) => {
   const st = calcStatus(medicine.expiryDate);
   const s = STATUS[st.key] || STATUS.unknown;
   const ingredients = [medicine.activeIngredient1, medicine.activeIngredient2, medicine.activeIngredient3].filter(Boolean);
@@ -81,6 +81,12 @@ export const MedicineCard = ({ medicine, onEdit, onDelete, onHistory }) => {
             className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" aria-label="Sil">
             <Trash2 size={15} />
           </button>
+          {onShare && (
+            <button onClick={() => onShare(medicine)}
+              className="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors" aria-label="Paylaş">
+              <Share2 size={15} />
+            </button>
+          )}
         </div>
       </div>
 

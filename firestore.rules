@@ -79,6 +79,16 @@ service cloud.firestore {
       allow read, write, delete: if isOwner(userId);
     }
 
+    match /sharedLinks/{token} {
+      // Herkes okuyabilir (salt okunur paylaşım)
+      allow read: if true;
+      // Sadece sahibi oluşturabilir ve silebilir
+      allow create: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.keys().hasOnly(['userId', 'medicineId', 'expiresAt', 'createdAt']);
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

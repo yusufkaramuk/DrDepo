@@ -8,6 +8,8 @@ import { exportMedicinesToCsv } from './services/CsvExport';
 import { MedicineDatabase } from './services/MedicineDatabase';
 import { useTheme } from './context/ThemeContext';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from './services/FirebaseClient';
 import { NotificationService } from './services/NotificationService';
 import { MedicineCard } from './components/MedicineCard';
 import { AddMedicineModal } from './components/AddMedicineModal';
@@ -15,6 +17,7 @@ import { BulkAddModal } from './components/BulkAddModal';
 import { DeleteModal } from './components/DeleteModal';
 import { AuthModal } from './components/AuthModal';
 import { UsageHistoryModal } from './components/UsageHistoryModal';
+import { ShareView } from './components/ShareView';
 
 // ── Icons (inline SVG, matches design handoff) ──────────────────────────────
 const Ic = ({ d, size = 18, stroke = 2, className = '', extra = null }) => (
@@ -358,6 +361,12 @@ const createLocalMedicine = (medicine) => ({
 function App() {
   const { theme, toggle: toggleTheme } = useTheme();
   const isOnline = useNetworkStatus();
+
+  // /share/:token route — auth gerektirmez
+  const shareToken = window.location.pathname.startsWith('/share/')
+    ? window.location.pathname.split('/share/')[1]
+    : null;
+  if (shareToken) return <ShareView token={shareToken} />;
   const [swUpdateReady, setSwUpdateReady] = useState(false);
 
   const [medicines, setMedicines] = useState([]);
@@ -546,6 +555,29 @@ function App() {
       setSyncing(false);
     }
     setDeletingMedicine(null);
+  };
+
+  const handleShare = async (medicine) => {
+    if (!user) return;
+    try {
+      // Rastgele token üret
+      const token = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+        .map(b => b.toString(16).padStart(2, '0')).join('');
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 gün
+
+      await setDoc(doc(db, `sharedLinks/${token}`), {
+        userId: user.uid,
+        medicineId: medicine.id,
+        expiresAt,
+        createdAt: new Date().toISOString(),
+      });
+
+      const url = `${window.location.origin}/share/${token}`;
+      await navigator.clipboard.writeText(url);
+      showToast('success', 'Paylaşım linki kopyalandı (7 gün geçerli)');
+    } catch {
+      showToast('error', 'Paylaşım linki oluşturulamadı');
+    }
   };
 
   const handleToggleNotifications = async () => {
@@ -897,7 +929,8 @@ function App() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredMedicines.map(m => (
               <MedicineCard key={m.id} medicine={m} onEdit={handleEdit} onDelete={handleDeleteRequest}
-                onHistory={useCloud && user ? setHistoryMedicine : null}/>
+                onHistory={useCloud && user ? setHistoryMedicine : null}
+                onShare={useCloud && user ? handleShare : null}/>
             ))}
           </div>
         )}
