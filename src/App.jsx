@@ -7,6 +7,7 @@ import { normalizeAndValidateMedicine, normalizeMedicineList } from './services/
 import { exportMedicinesToCsv } from './services/CsvExport';
 import { MedicineDatabase } from './services/MedicineDatabase';
 import { useTheme } from './context/ThemeContext';
+import { useNetworkStatus } from './hooks/useNetworkStatus';
 import { MedicineCard } from './components/MedicineCard';
 import { AddMedicineModal } from './components/AddMedicineModal';
 import { BulkAddModal } from './components/BulkAddModal';
@@ -281,7 +282,7 @@ const EmptyState = ({ searching, onAdd, onBulk }) => (
 );
 
 // ── Header ────────────────────────────────────────────────────────────────────
-const Header = ({ user, totalCount, useCloud, onToggleCloud, syncing, onSignOut, theme, onToggleTheme }) => (
+const Header = ({ user, totalCount, useCloud, onToggleCloud, syncing, onSignOut, theme, onToggleTheme, isOnline }) => (
   <header className="sticky top-0 z-30 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-700/80">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
       <div className="flex items-center gap-2.5">
@@ -295,6 +296,13 @@ const Header = ({ user, totalCount, useCloud, onToggleCloud, syncing, onSignOut,
       </div>
 
       <div className="flex-1"/>
+
+      {!isOnline && (
+        <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+          Çevrimdışı
+        </div>
+      )}
 
       <button onClick={onToggleCloud}
         className={`hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[12px] font-medium transition-colors border ${
@@ -334,6 +342,8 @@ const createLocalMedicine = (medicine) => ({
 // ── App ───────────────────────────────────────────────────────────────────────
 function App() {
   const { theme, toggle: toggleTheme } = useTheme();
+  const isOnline = useNetworkStatus();
+  const [swUpdateReady, setSwUpdateReady] = useState(false);
 
   const [medicines, setMedicines] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -355,6 +365,21 @@ function App() {
 
   // TITCK veritabanını arka planda güncelle
   useEffect(() => { MedicineDatabase.syncInBackground(); }, []);
+
+  // Service Worker güncelleme bildirimi
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.ready.then(reg => {
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        newWorker?.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            setSwUpdateReady(true);
+          }
+        });
+      });
+    });
+  }, []);
 
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -662,7 +687,26 @@ function App() {
         onSignOut={handleSignOut}
         theme={theme}
         onToggleTheme={toggleTheme}
+        isOnline={isOnline}
       />
+
+      {/* SW güncelleme bildirimi */}
+      {swUpdateReady && (
+        <div className="fixed top-[60px] left-0 right-0 z-40 flex justify-center pointer-events-none">
+          <div className="pointer-events-auto flex items-center gap-3 bg-[var(--brand-600)] text-white text-[13px] font-medium px-5 py-3 rounded-2xl shadow-2xl ring-1 ring-black/10 animate-[slideUp_.25s_cubic-bezier(.22,.61,.36,1)]">
+            <Icon.Sparkles size={15}/>
+            <span>Yeni sürüm hazır!</span>
+            <button
+              onClick={() => window.location.reload()}
+              className="ml-1 underline underline-offset-2 hover:no-underline">
+              Yenile
+            </button>
+            <button onClick={() => setSwUpdateReady(false)} className="opacity-70 hover:opacity-100 ml-1">
+              <Icon.X size={14}/>
+            </button>
+          </div>
+        </div>
+      )}
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8">
         {/* Hero / greeting */}
