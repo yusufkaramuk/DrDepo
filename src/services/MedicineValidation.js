@@ -6,7 +6,8 @@ export const MEDICINE_FIELDS = [
     'activeIngredient2',
     'activeIngredient3',
     'notes',
-    'createdAt'
+    'createdAt',
+    'tags'
 ];
 
 export const MEDICINE_LIMITS = {
@@ -54,6 +55,14 @@ const isValidCreatedAt = (value) => (
     /^\d{4}-\d{2}-\d{2}T/.test(value)
 );
 
+const normalizeTags = (tags) => {
+    if (!Array.isArray(tags)) return [];
+    return tags
+        .map(t => textValue(String(t), 40))
+        .filter(Boolean)
+        .slice(0, 10);
+};
+
 export const normalizeMedicine = (medicine = {}, options = {}) => {
     const createdAt = options.preserveCreatedAt && medicine.createdAt
         ? textValue(medicine.createdAt, MEDICINE_LIMITS.createdAt)
@@ -67,6 +76,7 @@ export const normalizeMedicine = (medicine = {}, options = {}) => {
         activeIngredient2: textValue(medicine.activeIngredient2, MEDICINE_LIMITS.activeIngredient2),
         activeIngredient3: textValue(medicine.activeIngredient3, MEDICINE_LIMITS.activeIngredient3),
         notes: textValue(medicine.notes, MEDICINE_LIMITS.notes),
+        tags: normalizeTags(medicine.tags),
         createdAt
     };
 };
@@ -90,6 +100,10 @@ export const validateMedicine = (medicine, options = {}) => {
 
     MEDICINE_FIELDS.forEach((field) => {
         if (field === 'createdAt') return;
+        if (field === 'tags') {
+            if (!Array.isArray(medicine.tags)) errors.push('Etiketler dizi olmali');
+            return;
+        }
 
         const value = medicine[field] ?? '';
         if (typeof value !== 'string') {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 const Ic = ({ d, size = 18, stroke = 2, className = '', extra = null }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24"
@@ -26,7 +26,64 @@ const Field = ({ label, hint, required, children }) => (
   </label>
 );
 
-const EMPTY = { name: '', quantity: '', expiryDate: '', activeIngredient1: '', activeIngredient2: '', activeIngredient3: '', notes: '', createdAt: '' };
+const EMPTY = { name: '', quantity: '', expiryDate: '', activeIngredient1: '', activeIngredient2: '', activeIngredient3: '', notes: '', tags: [], createdAt: '' };
+
+const SUGGESTED_TAGS = ['Ağrı Kesici', 'Antibiyotik', 'Vitamin', 'Antidepresan', 'Tansiyon', 'Şeker', 'Soğuk Algınlığı', 'Cilt', 'Göz', 'Sindirim'];
+
+const TagInput = ({ tags, onChange }) => {
+  const [input, setInput] = useState('');
+  const inputRef = useRef(null);
+
+  const addTag = (val) => {
+    const tag = val.trim();
+    if (!tag || tags.includes(tag) || tags.length >= 10) return;
+    onChange([...tags, tag]);
+    setInput('');
+  };
+
+  const removeTag = (tag) => onChange(tags.filter(t => t !== tag));
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(input); }
+    if (e.key === 'Backspace' && !input && tags.length) removeTag(tags[tags.length - 1]);
+  };
+
+  const suggestions = SUGGESTED_TAGS.filter(s => !tags.includes(s));
+
+  return (
+    <div>
+      <div
+        className="min-h-[44px] w-full px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white focus-within:border-[var(--brand-500)] focus-within:ring-4 focus-within:ring-[var(--brand-100)] flex flex-wrap gap-1.5 cursor-text"
+        onClick={() => inputRef.current?.focus()}>
+        {tags.map(tag => (
+          <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--brand-50)] text-[var(--brand-700)] ring-1 ring-[var(--brand-100)] text-[12px] font-medium">
+            {tag}
+            <button type="button" onClick={e => { e.stopPropagation(); removeTag(tag); }} className="hover:text-[var(--brand-900)] opacity-60 hover:opacity-100">×</button>
+          </span>
+        ))}
+        <input
+          ref={inputRef}
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={() => { if (input.trim()) addTag(input); }}
+          placeholder={tags.length === 0 ? 'Etiket ekle ve Enter\'a bas…' : ''}
+          className="flex-1 min-w-[120px] outline-none text-[13px] text-slate-700 bg-transparent py-0.5 px-1"
+        />
+      </div>
+      {suggestions.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {suggestions.slice(0, 6).map(s => (
+            <button key={s} type="button" onClick={() => addTag(s)}
+              className="text-[11px] px-2 py-0.5 rounded-full border border-dashed border-slate-300 text-slate-500 hover:border-[var(--brand-400)] hover:text-[var(--brand-700)] transition-colors">
+              + {s}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const AddMedicineModal = ({ isOpen, onClose, onSave, initialData, isEdit }) => {
   const [data, setData] = useState(EMPTY);
@@ -116,6 +173,15 @@ export const AddMedicineModal = ({ isOpen, onClose, onSave, initialData, isEdit 
                 />
               ))}
             </div>
+          </div>
+
+          <div className="sm:col-span-2">
+            <Field label="Etiketler" hint="En fazla 10 etiket">
+              <TagInput
+                tags={data.tags || []}
+                onChange={tags => set('tags', tags)}
+              />
+            </Field>
           </div>
 
           <div className="sm:col-span-2">

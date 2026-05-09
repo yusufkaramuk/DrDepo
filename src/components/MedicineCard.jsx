@@ -93,6 +93,17 @@ export const MedicineCard = ({ medicine, onEdit, onDelete }) => {
         </div>
       )}
 
+      {/* Tags */}
+      {medicine.tags && medicine.tags.length > 0 && (
+        <div className="mt-2.5 flex flex-wrap gap-1">
+          {medicine.tags.map(tag => (
+            <span key={tag} className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--brand-50)] text-[var(--brand-700)] ring-1 ring-[var(--brand-100)] font-medium">
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* Notes */}
       {medicine.notes && (
         <div className="mt-3 text-[12.5px] text-slate-500 line-clamp-2 italic">"{medicine.notes}"</div>
