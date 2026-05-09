@@ -90,7 +90,7 @@ export const AuthModal = ({ isOpen, onClose, onAuth }) => {
             return;
         }
 
-        if (!formData.email || !formData.email.includes('@')) {
+        if (!formData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
             setError('Gecerli bir e-posta adresi girin');
             return;
         }
