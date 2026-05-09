@@ -8,6 +8,7 @@ import { exportMedicinesToCsv } from './services/CsvExport';
 import { MedicineDatabase } from './services/MedicineDatabase';
 import { useTheme } from './context/ThemeContext';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
+import { NotificationService } from './services/NotificationService';
 import { MedicineCard } from './components/MedicineCard';
 import { AddMedicineModal } from './components/AddMedicineModal';
 import { BulkAddModal } from './components/BulkAddModal';
@@ -52,6 +53,8 @@ const Icon = {
   Drop:     (p) => <Ic {...p} d="M12 2.7s5 5.3 5 9.3a5 5 0 0 1-10 0c0-4 5-9.3 5-9.3Z"/>,
   Moon:     (p) => <Ic {...p} d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>,
   Sun:      (p) => <Ic {...p} extra={<><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></>}/>,
+  Bell:     (p) => <Ic {...p} extra={<><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></>}/>,
+  BellOff:  (p) => <Ic {...p} extra={<><path d="M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 1 .6 5"/><path d="M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><line x1="2" x2="22" y1="2" y2="22"/></>}/>,
 };
 
 // ── Status helpers ────────────────────────────────────────────────────────────
@@ -283,7 +286,7 @@ const EmptyState = ({ searching, onAdd, onBulk }) => (
 );
 
 // ── Header ────────────────────────────────────────────────────────────────────
-const Header = ({ user, totalCount, useCloud, onToggleCloud, syncing, onSignOut, theme, onToggleTheme, isOnline }) => (
+const Header = ({ user, totalCount, useCloud, onToggleCloud, syncing, onSignOut, theme, onToggleTheme, isOnline, notifPermission, onToggleNotifications }) => (
   <header className="sticky top-0 z-30 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-700/80">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
       <div className="flex items-center gap-2.5">
@@ -318,6 +321,17 @@ const Header = ({ user, totalCount, useCloud, onToggleCloud, syncing, onSignOut,
       <div className="hidden sm:block w-px h-6 bg-slate-200 dark:bg-slate-700"/>
 
       <div className="flex items-center gap-1.5">
+        {notifPermission !== 'unsupported' && notifPermission !== 'denied' && (
+          <button onClick={onToggleNotifications}
+            className={`p-2 rounded-xl transition-colors ${
+              notifPermission === 'granted'
+                ? 'text-[var(--brand-600)] bg-[var(--brand-50)] hover:bg-[var(--brand-100)]'
+                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100'
+            }`}
+            aria-label={notifPermission === 'granted' ? 'Bildirimleri kapat' : 'Bildirimleri aç'}>
+            {notifPermission === 'granted' ? <Icon.Bell size={17}/> : <Icon.BellOff size={17}/>}
+          </button>
+        )}
         <button onClick={onToggleTheme}
           className="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
           aria-label={theme === 'dark' ? 'Açık mod' : 'Karanlık mod'}>
@@ -392,6 +406,9 @@ function App() {
   const [modalInitialData, setModalInitialData] = useState(null);
   const [deletingMedicine, setDeletingMedicine] = useState(null);
   const [historyMedicine, setHistoryMedicine] = useState(null);
+  const [notifPermission, setNotifPermission] = useState(
+    NotificationService.isSupported() ? NotificationService.getPermission() : 'unsupported'
+  );
 
   // Toast auto-dismiss
   useEffect(() => {
@@ -529,6 +546,25 @@ function App() {
       setSyncing(false);
     }
     setDeletingMedicine(null);
+  };
+
+  const handleToggleNotifications = async () => {
+    if (!user) return;
+    if (notifPermission === 'granted') {
+      await NotificationService.unsubscribe(user.uid);
+      setNotifPermission('default');
+      showToast('info', 'Bildirimler kapatıldı');
+    } else {
+      const granted = await NotificationService.requestPermission();
+      if (granted) {
+        await NotificationService.subscribe(user.uid);
+        setNotifPermission('granted');
+        showToast('success', 'Bildirimler açıldı — SKT yaklaşınca uyarılacaksınız');
+      } else {
+        setNotifPermission('denied');
+        showToast('error', 'Bildirim izni reddedildi');
+      }
+    }
   };
 
   const handleExportCsv = () => {
@@ -690,6 +726,8 @@ function App() {
         theme={theme}
         onToggleTheme={toggleTheme}
         isOnline={isOnline}
+        notifPermission={notifPermission}
+        onToggleNotifications={handleToggleNotifications}
       />
 
       {/* SW güncelleme bildirimi */}

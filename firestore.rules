@@ -75,6 +75,10 @@ service cloud.firestore {
       }
     }
 
+    match /users/{userId}/pushSubscriptions/{subId} {
+      allow read, write, delete: if isOwner(userId);
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
