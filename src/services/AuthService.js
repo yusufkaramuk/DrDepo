@@ -4,9 +4,14 @@ import {
     signOut,
     onAuthStateChanged,
     sendPasswordResetEmail,
-    updateProfile
+    sendEmailVerification,
+    updateProfile,
+    GoogleAuthProvider,
+    signInWithPopup
 } from 'firebase/auth';
 import { auth } from './FirebaseClient';
+
+const googleProvider = new GoogleAuthProvider();
 
 export const AuthService = {
     signUp: async (email, password, displayName) => {
@@ -17,10 +22,13 @@ export const AuthService = {
                 await updateProfile(userCredential.user, { displayName });
             }
 
-            console.log('[Auth] User signed up:', userCredential.user.uid);
-            return userCredential.user;
+            await sendEmailVerification(userCredential.user);
+
+            // Kayıt sonrası hemen oturumu kapat — doğrulama zorunlu
+            await signOut(auth);
+
+            return { needsVerification: true };
         } catch (error) {
-            console.error('[Auth] Sign up error:', error);
             throw new Error(getErrorMessage(error.code));
         }
     },
@@ -28,10 +36,37 @@ export const AuthService = {
     signIn: async (email, password) => {
         try {
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            console.log('[Auth] User signed in:', userCredential.user.uid);
+
+            if (!userCredential.user.emailVerified) {
+                await signOut(auth);
+                throw new Error('E-posta adresiniz henuz dogrulanmamis. Lutfen gelen kutunuzu kontrol edin.');
+            }
+
             return userCredential.user;
         } catch (error) {
-            console.error('[Auth] Sign in error:', error);
+            if (error.message.includes('dogrulanmamis')) throw error;
+            throw new Error(getErrorMessage(error.code, 'signin'));
+        }
+    },
+
+    signInWithGoogle: async () => {
+        try {
+            const userCredential = await signInWithPopup(auth, googleProvider);
+            return userCredential.user;
+        } catch (error) {
+            if (error.code === 'auth/popup-closed-by-user') {
+                throw new Error('Google girisi iptal edildi');
+            }
+            throw new Error(getErrorMessage(error.code, 'signin'));
+        }
+    },
+
+    resendVerification: async (email, password) => {
+        try {
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            await sendEmailVerification(userCredential.user);
+            await signOut(auth);
+        } catch (error) {
             throw new Error(getErrorMessage(error.code, 'signin'));
         }
     },
@@ -39,9 +74,7 @@ export const AuthService = {
     signOut: async () => {
         try {
             await signOut(auth);
-            console.log('[Auth] User signed out');
         } catch (error) {
-            console.error('[Auth] Sign out error:', error);
             throw new Error('Cikis yapilirken hata olustu');
         }
     },
@@ -49,9 +82,7 @@ export const AuthService = {
     resetPassword: async (email) => {
         try {
             await sendPasswordResetEmail(auth, email);
-            console.log('[Auth] Password reset request completed');
         } catch (error) {
-            console.error('[Auth] Password reset error:', error);
             throw new Error(getErrorMessage(error.code, 'reset'));
         }
     },

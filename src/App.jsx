@@ -95,11 +95,15 @@ function App() {
   const handleAuth = async (action, data) => {
     try {
       if (action === 'signup') {
-        await AuthService.signUp(data.email, data.password, data.displayName);
+        return await AuthService.signUp(data.email, data.password, data.displayName);
       } else if (action === 'signin') {
         await AuthService.signIn(data.email, data.password);
+      } else if (action === 'google') {
+        await AuthService.signInWithGoogle();
       } else if (action === 'reset') {
         await AuthService.resetPassword(data.email);
+      } else if (action === 'resend') {
+        await AuthService.resendVerification(data.email, data.password);
       }
     } catch (error) {
       throw error;
