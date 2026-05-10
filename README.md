@@ -1,6 +1,6 @@
 # İlaç Stok Takip Sistemi
 
-Modern, güvenli ve kullanıcı dostu bir web uygulaması. Evinizdeki ilaçları dijital ortamda takip edin, son kullanma tarihlerini kontrol edin ve stok yönetiminizi kolaylaştırın.
+Modern, güvenli ve kullanıcı dostu bir web uygulaması. Evinizdeki ilaçları dijital ortamda takip edin, son kullanma tarihlerini kontrol edin ve aile üyeleriyle paylaşın.
 
 **Canlı Demo:** [https://ilac-stok-takip.web.app](https://ilac-stok-takip.web.app)
 
@@ -8,60 +8,72 @@ Modern, güvenli ve kullanıcı dostu bir web uygulaması. Evinizdeki ilaçları
 
 ## Özellikler
 
-### Güvenli Kullanıcı Yönetimi
-- Firebase Authentication ile e-posta/şifre girişi
+### Kullanıcı Yönetimi
+- Firebase Authentication ile e-posta/şifre ve Google girişi
 - Kullanıcı izolasyonu — her kullanıcı yalnızca kendi verilerine erişir
-- E-posta ile şifre sıfırlama
+- E-posta doğrulama ve şifre sıfırlama
 - Firebase App Check + reCAPTCHA v3 ile bot koruması
 
 ### İlaç Yönetimi
 - İlaç ekleme, düzenleme, silme ve listeleme (CRUD)
 - Her ilaç için 3 farklı etken madde kaydı
-- Akıllı gruplama: aynı bilgilere sahip ilaçlar otomatik gruplanır (x2, x3 gösterimi)
-- Toplu ekleme: birden fazla ilacı tek seferde ekleyin
+- Akıllı gruplama: aynı bilgilere sahip ilaçlar otomatik gruplanır (×2, ×3 gösterimi)
+- Toplu ekleme: birden fazla ilacı tek seferde JSON ile içe aktarın
 - Gelişmiş silme: gruptan istediğiniz kadar ilacı seçerek silin
+- Etiket sistemi: ilaçlara özel etiket ekleyin ve etiketle filtreleyin
 
-### OCR ile İlaç Tanıma
-- Kamera veya dosyadan ilaç ambalajını taratın
-- Tesseract.js ile metin tanıma
-- Google Gemini AI ile akıllı ilaç bilgisi çıkarımı
+### Barkod Tarama & TİTCK Entegrasyonu
+- Kamera ile barkod okuma
+- 22.000+ ilaç kaydı içeren TİTCK veritabanı ile otomatik eşleştirme
+- Barkod okunduğunda ticari ad, doz, form ve etken maddeler otomatik doldurulur
+- Veriler IndexedDB'de önbelleğe alınır — offline çalışır
+
+### Aile Modu
+- E-posta ile aile üyesi daveti (7 günlük geçerlilik)
+- Aile üyeleri birbirinin ilaç stoğunu görebilir
+- **Özel İlaç** seçeneği — işaretlenen ilaçlar aile üyelerine gizlenir
+- Admin/üye rol sistemi: sadece admin yeni üye davet edebilir
 
 ### Akıllı Arama ve Sıralama
 - Fuzzy Search: yanlış yazımlara toleranslı arama (Levenshtein algoritması)
-- İlaç adı ve tüm etken maddeler üzerinde arama
-- 8 farklı sıralama seçeneği:
-  - Tarih bazlı (en yeni / en eski)
-  - Alfabetik (A–Z, Z–A)
-  - Son kullanma tarihi (yakında bitecek / uzun süreliler)
-  - Kopya sayısı (çok / az)
-- Gerçek zamanlı filtreleme
+- İlaç adı ve tüm etken maddeler üzerinde anlık arama
+- 8 farklı sıralama seçeneği (tarih, alfabetik, son kullanma, kopya sayısı)
+- Durum filtresi: Tümü / Süresi Geçmiş / Yakında Bitiyor / Güvenli
 
 ### Son Kullanma Takibi
-- Otomatik renk uyarıları:
-  - Kırmızı — süresi geçmiş
-  - Turuncu — 30 gün içinde bitiyor
-  - Yeşil — iyi durumda
+- Otomatik renk uyarıları: Kırmızı (geçmiş) · Turuncu (30 gün) · Yeşil (güvenli)
 - Ay/Yıl formatında pratik tarih girişi
-- Türkçe tarih gösterimi ("Aralık 2025" formatı)
-- Yakında bitecek ilaçlar için kalan gün sayacı
+- Türkçe tarih gösterimi ve kalan gün sayacı
 
-### Bulut Senkronizasyonu
-- Firebase Firestore ile gerçek zamanlı veri senkronizasyonu
-- Çoklu cihaz desteği (telefon, tablet, bilgisayar)
-- Kullanıcı bazlı veri izolasyonu
-- LocalStorage yedekleme ile offline çalışma
-- Bulut / yerel mod arası kolay geçiş
+### Kullanım Geçmişi
+- Her ilaç için kullanım kaydı: kullanıldı, bitti, eklendi, düzenlendi
+- İsteğe bağlı not eklenebilir
+- Tüm kullanıcı geçmişini tek ekranda görme
+
+### Push Bildirimleri
+- Son kullanma tarihi yaklaşan ilaçlar için otomatik bildirim
+- Web Push (VAPID) ile tarayıcı bildirimi desteği
+- GitHub Actions ile zamanlanmış günlük kontrol
+
+### Salt Okunur Paylaşım Linki
+- Seçili bir ilacı şifre gerektirmeden paylaşın
+- 7 günlük geçerlilik süresi olan benzersiz token
+- Paylaşılan ilaç verisi Firestore'da saklanır, okuyan kullanıcı hesabı gerektirmez
 
 ### Veri Yönetimi
-- JSON ile dışa/içe aktarma (yedekleme ve geri yükleme)
-- Firebase'e toplu JSON aktarımı
+- CSV ve JSON ile dışa aktarma
+- JSON ile toplu içe aktarma (yedek geri yükleme)
 - Her değişiklik anında otomatik kaydedilir
 
 ### Progressive Web App (PWA)
 - Ana ekrana eklenebilir — telefonda uygulama gibi çalışır
-- Offline çalışma desteği
-- Network-first caching stratejisi
+- Offline çalışma desteği (IndexedDB + Service Worker)
 - Responsive tasarım (mobil ve masaüstü)
+
+### Arayüz
+- Karanlık mod / Açık mod
+- Liste ve grid görünümü
+- Türkçe arayüz
 
 ---
 
@@ -104,17 +116,17 @@ VITE_FIREBASE_APP_ID=your_app_id
 VITE_RECAPTCHA_V3_SITE_KEY=your_recaptcha_key
 VITE_ENABLE_APP_CHECK=true
 
-# Opsiyonel — Google Gemini AI (OCR özelliği için)
-VITE_GEMINI_API_KEY=your_gemini_api_key
+# Opsiyonel — Web Push bildirimleri (VAPID)
+VITE_VAPID_PUBLIC_KEY=your_vapid_public_key
 
 # Opsiyonel — Firebase Emulators (yerel geliştirme)
 VITE_USE_FIREBASE_EMULATORS=false
 ```
 
 **4. Kurulum kılavuzları**
-- [FIREBASE_SETUP.md](FIREBASE_SETUP.md) — Firebase proje kurulumu
-- [AUTHENTICATION_SETUP.md](AUTHENTICATION_SETUP.md) — Authentication aktifleştirme
-- [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) — Production deployment
+- [docs/FIREBASE_SETUP.md](docs/FIREBASE_SETUP.md) — Firebase proje kurulumu
+- [docs/AUTHENTICATION_SETUP.md](docs/AUTHENTICATION_SETUP.md) — Authentication aktifleştirme
+- [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md) — Production deployment
 
 **5. Uygulamayı başlatın**
 ```bash
@@ -127,11 +139,14 @@ Tarayıcınızda `http://localhost:5173` adresini açın.
 
 ## Deployment
 
-### Firebase Hosting
-
 ```bash
 npm run build
-firebase deploy
+npx firebase deploy
+```
+
+TİTCK ilaç veritabanını güncellemek için:
+```bash
+node scripts/fetch-titck-data.js
 ```
 
 ---
@@ -154,18 +169,18 @@ firebase deploy
 | Firebase Hosting | Statik web hosting |
 | Firebase App Check | Bot ve kötüye kullanım koruması |
 
-### Yapay Zeka & OCR
+### PWA & Offline
 | Teknoloji | Amaç |
 |-----------|-------|
-| Google Gemini AI | İlaç bilgisi çıkarımı |
-| Tesseract.js | OCR metin tanıma |
+| Service Worker | Offline caching |
+| IndexedDB | TİTCK ilaç veritabanı önbelleği |
+| Web Push (VAPID) | Push bildirimleri |
 
 ### Algoritmalar
 | Teknoloji | Amaç |
 |-----------|-------|
 | Levenshtein Distance | Fuzzy search |
-| LocalStorage API | Offline storage |
-| Service Workers | PWA caching |
+| ExcelJS | TİTCK Excel ayrıştırma |
 
 ---
 
@@ -173,182 +188,106 @@ firebase deploy
 
 ```
 ilacStokTakipSistemi/
+├── docs/                            # Kurulum ve deployment kılavuzları
 ├── public/
-│   ├── manifest.json            # PWA manifest
-│   ├── sw.js                    # Service Worker
-│   ├── icon-192.png
-│   └── icon-512.png
+│   ├── manifest.json                # PWA manifest
+│   └── sw.js                        # Service Worker
+├── scripts/
+│   ├── fetch-titck-data.js          # TİTCK Excel → medicines.json
+│   └── send-notifications.js        # Push bildirim gönderici
 ├── src/
 │   ├── components/
-│   │   ├── ui/
-│   │   │   └── BaseComponents.jsx   # Button, Input, Badge, Card
-│   │   ├── AddMedicineModal.jsx     # Tek ilaç ekleme
-│   │   ├── AuthModal.jsx            # Giriş/Kayıt modal
-│   │   ├── BulkAddModal.jsx         # Toplu ilaç ekleme
-│   │   ├── DeleteModal.jsx          # Silme onay modal
-│   │   └── MedicineCard.jsx         # İlaç kartı bileşeni
+│   │   ├── AddMedicineModal.jsx     # İlaç ekleme/düzenleme
+│   │   ├── AllHistoryModal.jsx      # Tüm kullanım geçmişi
+│   │   ├── AuthModal.jsx            # Giriş/Kayıt
+│   │   ├── BarcodeScanner.jsx       # Kamera barkod okuyucu
+│   │   ├── BulkAddModal.jsx         # Toplu JSON import
+│   │   ├── DeleteModal.jsx          # Silme onay
+│   │   ├── FamilyModal.jsx          # Aile modu yönetimi
+│   │   ├── MedicineCard.jsx         # İlaç kartı
+│   │   ├── ShareView.jsx            # Paylaşım link görünümü
+│   │   ├── UsageHistoryModal.jsx    # İlaç kullanım geçmişi
+│   │   └── ui/
+│   │       └── BaseComponents.jsx   # Ortak UI bileşenleri
 │   ├── config/
 │   │   └── firebase.js              # Firebase yapılandırması
-│   ├── models/
-│   │   └── Medicine.js              # İlaç veri modeli
 │   ├── services/
 │   │   ├── AuthService.js           # Firebase Auth işlemleri
+│   │   ├── CsvExport.js             # CSV dışa aktarma
+│   │   ├── FamilyService.js         # Aile modu işlemleri
 │   │   ├── FirebaseClient.js        # Firebase başlatma & App Check
 │   │   ├── FirebaseService.js       # Firestore CRUD
 │   │   ├── FuzzySearch.js           # Levenshtein arama
+│   │   ├── MedicineDatabase.js      # TİTCK IndexedDB yönetimi
 │   │   ├── MedicineValidation.js    # Veri doğrulama & normalize
+│   │   ├── NotificationService.js   # Web Push yönetimi
 │   │   └── StorageManager.js        # LocalStorage yönetimi
 │   ├── App.jsx                      # Ana uygulama bileşeni
 │   ├── main.jsx                     # Entry point
 │   └── index.css                    # Global stiller
 ├── tests/
 │   └── firestore.rules.test.js      # Güvenlik kuralı testleri
-├── .env.example                     # Ortam değişkeni şablonu
-├── .gitignore
+├── .env.example
 ├── firebase.json
-├── firestore.rules                  # Firestore güvenlik kuralları
+├── firestore.indexes.json
+├── firestore.rules
 ├── index.html
-├── package.json
-├── AUTHENTICATION_SETUP.md
-├── DEPLOYMENT_GUIDE.md
-└── FIREBASE_SETUP.md
+└── package.json
 ```
-
----
-
-## Kullanım
-
-### İlaç Ekleme
-1. **"Tek İlaç Ekle"** veya **"Toplu Ekle"** butonuna tıklayın
-2. Formu doldurun: ilaç adı, etken maddeler, miktar, son kullanma tarihi, notlar
-3. **"Kaydet"**
-
-### OCR ile Ekleme
-1. İlaç ekleme modalında kamera simgesine tıklayın
-2. İlaç ambalajını kameraya gösterin veya fotoğraf yükleyin
-3. Sistem metni tanıyıp formu otomatik dolduracaktır
-
-### Arama
-```
-"parol"       → Parol bulunur
-"paral"       → Parol bulunur (fuzzy match)
-"parasetamol" → Parasetamol içeren tüm ilaçlar
-```
-
-### Silme
-1. İlaç kartındaki çöp kutusu simgesine tıklayın
-2. **Tek ilaç**: "Silmek için Onayla"
-3. **Gruplandırılmış**: kaç tane silmek istediğinizi girin veya "Tümünü Sil"
 
 ---
 
 ## Güvenlik
 
-### Geliştirme
-- `.env` dosyası `.gitignore` ile korunur, GitHub'a yüklenmez
-- Her geliştirici kendi Firebase credentials'ını kullanır
-- Firebase Emulator desteği ile yerel geliştirme
-
-### Production
-- **Firestore Security Rules** — kullanıcı bazlı veri izolasyonu
+- **Firestore Security Rules** — kullanıcı ve aile bazlı veri izolasyonu
 - **Firebase App Check** — reCAPTCHA v3 ile bot koruması
-- **HTTPS** — Firebase Hosting tarafından otomatik sağlanır
-- **Input Validation** — `MedicineValidation` servisi ile sunucu öncesi doğrulama
-
-### Firestore Güvenlik Kuralları
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{userId}/medicines/{medicineId} {
-      allow read, write: if request.auth != null
-                         && request.auth.uid == userId;
-    }
-  }
-}
-```
+- **HTTPS** — Firebase Hosting tarafından otomatik
+- **Input Validation** — `MedicineValidation` servisi ile her yazma öncesi doğrulama
+- `.env` dosyası `.gitignore` ile korunur
 
 ### Güvenlik Testleri
 ```bash
 npm run test:rules     # Firestore kural testlerini çalıştır
-npm run test:security  # Tam güvenlik kontrolü (audit + rules + build)
+npm run test:security  # Tam güvenlik kontrolü
 ```
-
----
-
-## Browser Desteği
-
-| Tarayıcı | Minimum Versiyon |
-|----------|-----------------|
-| Chrome | 90+ |
-| Firefox | 88+ |
-| Safari | 14+ |
-| Edge | 90+ |
-| iOS Safari | 14+ |
-| Chrome Android | 90+ |
-
----
-
-## Performans
-
-- Lighthouse Score: 95+
-- First Contentful Paint: < 1s
-- Bundle Size: ~520KB (gzipped: ~160KB)
-- Service Worker ile network-first caching
 
 ---
 
 ## Changelog
 
+### v2.3.0
+- **Aile Modu**: e-posta daveti, aile üyesi ilaç görüntüleme, Özel İlaç gizleme
+- **Barkod düzeltmeleri**: TİTCK 2026 URL dinamik keşif, mobil IndexedDB timeout çözümü
+- **Firestore**: cross-user okuma kuralları, davet kabul izni, `persistentLocalCache` geçişi
+- Proje dosya yapısı temizlendi (`docs/` klasörü, gereksiz dosyalar silindi)
+
+### v2.2.0
+- **Barkod Tarama**: kamera ile barkod okuma, TİTCK veritabanı entegrasyonu (22.000+ ilaç)
+- **Kullanım Geçmişi**: ilaç bazlı kayıt (kullanıldı, bitti, eklendi, düzenlendi)
+- **Push Bildirimleri**: Web Push VAPID ile son kullanma tarihi uyarıları
+- **Paylaşım Linki**: salt okunur, 7 günlük token bazlı paylaşım
+- Offline-First PWA: IndexedDB chunked yazma, Service Worker v5
+
 ### v2.1.1
-- Firebase güvenlik tabanı sertleştirildi (App Check, geliştirilmiş Firestore kuralları)
-- Güvenlik test altyapısı eklendi (`test:rules`, `test:security`)
+- Firebase güvenlik tabanı sertleştirildi (App Check, gelişmiş Firestore kuralları)
+- Güvenlik test altyapısı eklendi
 
 ### v2.1.0
 - Firebase Authentication ile kullanıcı kayıt/giriş sistemi
+- Google ile giriş
+- Etiket sistemi ve gelişmiş filtreleme
+- Karanlık mod
+- CSV dışa aktarma
 - 8 farklı sıralama seçeneği
-- Kullanıcı bazlı veri izolasyonu
-- Gelişmiş silme modal (esnek seçenekler)
-- Network-first Service Worker
-
-### v2.0.1
-- Firebase import hatası düzeltildi
-- Build optimizasyonları
-- PWA Service Worker cache iyileştirmeleri
 
 ### v2.0.0
 - PWA desteği (Progressive Web App)
 - Fuzzy Search (Levenshtein algoritması)
-- 3 etken madde alanı
-- Toplu ilaç ekleme
-- Akıllı gruplama (x2, x3 gösterimi)
 - Firebase Firestore entegrasyonu
-
-### v1.3.0
-- Fuzzy Search algoritması
-- Çoklu alan araması (ilaç adı + etken maddeler)
-
-### v1.2.0
-- İlaç gruplama (Nx görünümü)
-- Adetli silme özelliği
-
-### v1.1.2
-- Aramaya etken maddeler dahil edildi
-
-### v1.1.1
-- 3 etken madde ekleme özelliği
-
-### v1.1.0
-- Son kullanma tarihi format düzenlemesi (Ay/Yıl)
-- Türkçe tarih gösterimi
+- Toplu ilaç ekleme, akıllı gruplama
 
 ### v1.0.0
-- İlk sürüm
-- Temel CRUD işlemleri
-- LocalStorage ile yerel veri saklama
-- Son kullanma tarihi takibi
-- Arama ve filtreleme
-- Tailwind CSS ile modern tasarım
+- İlk sürüm: temel CRUD, LocalStorage, son kullanma takibi
 
 ---
 
@@ -371,9 +310,8 @@ MIT License — ayrıntılar için [LICENSE](LICENSE) dosyasına bakın.
 ## İletişim
 
 - **Geliştirici**: Yusuf Karamuk
-- **Email**: yusufkaramuk10@gmail.com
 - **GitHub**: [@yusufkaramuk](https://github.com/yusufkaramuk)
 
 ---
 
-> Bu proje ev kullanımı ve eğitim amaçlıdır. Ticari kullanım veya hassas sağlık verileri için ek güvenlik önlemleri almanız önerilir.
+> Bu proje ev kullanımı ve eğitim amaçlıdır.
