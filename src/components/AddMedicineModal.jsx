@@ -152,7 +152,7 @@ export const AddMedicineModal = ({ isOpen, onClose, onSave, initialData, isEdit,
       setScanStatus('error');
       setScanError(err?.message || String(err));
     }
-    setTimeout(() => { setScanStatus(null); setScanDebug(null); }, 10000);
+    setTimeout(() => { setScanStatus(null); }, 10000);
   };
 
   return (

@@ -790,11 +790,12 @@ function App() {
   const stats = useMemo(() => {
     let total = 0, expired = 0, warning = 0, good = 0;
     allMedicines.forEach(m => {
-      total += 1;
+      const count = m.count || 1;
+      total += count;
       const k = statusOf(m).key;
-      if (k === 'expired') expired += 1;
-      else if (k === 'warning') warning += 1;
-      else good += 1;
+      if (k === 'expired') expired += count;
+      else if (k === 'warning') warning += count;
+      else good += count;
     });
     return { total, expired, warning, good };
   }, [allMedicines]);

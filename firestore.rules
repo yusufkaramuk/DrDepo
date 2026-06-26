@@ -30,7 +30,7 @@ service cloud.firestore {
 
     function validMedicine(data) {
       return data.keys().hasOnly([
-          'name', 'quantity', 'expiryDate',
+          'name', 'quantity', 'expiryDate', 'barcode',
           'activeIngredient1', 'activeIngredient2', 'activeIngredient3',
           'notes', 'createdAt', 'tags', 'familyId', 'isPrivate', 'stockCount'
         ]) &&
@@ -43,6 +43,7 @@ service cloud.firestore {
         validOptionalString(data, 'notes', 500) &&
         validExpiryDate(data) &&
         validCreatedAt(data) &&
+        (!data.keys().hasAny(['barcode']) || (data.barcode is string && data.barcode.size() <= 20)) &&
         (!data.keys().hasAny(['tags']) || data.tags is list) &&
         (!data.keys().hasAny(['isPrivate']) || data.isPrivate is bool) &&
         (!data.keys().hasAny(['familyId']) || data.familyId is string) &&
@@ -96,7 +97,7 @@ service cloud.firestore {
     }
 
     match /families/{familyId} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && resource.data.members.keys().hasAny([request.auth.uid]);
       allow create: if isSignedIn() &&
         request.resource.data.createdBy == request.auth.uid &&
         request.resource.data.members.keys().hasOnly([request.auth.uid]);
@@ -115,14 +116,14 @@ service cloud.firestore {
 
     // Davetler: giriş yapmış herkes kendi e-postasına gelen davetleri okuyabilir
     match /invites/{inviteId} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && (resource.data.invitedEmail == request.auth.token.email || resource.data.invitedBy == request.auth.token.email);
       allow create: if isSignedIn() &&
         request.resource.data.keys().hasOnly(['familyId', 'familyName', 'invitedEmail', 'invitedBy', 'status', 'createdAt', 'expiresAt']) &&
         request.resource.data.status == 'pending';
       allow update: if isSignedIn() &&
         resource.data.invitedEmail == request.auth.token.email &&
         request.resource.data.status in ['accepted', 'rejected'];
-      allow delete: if isSignedIn();
+      allow delete: if isSignedIn() && (resource.data.invitedBy == request.auth.token.email || resource.data.invitedEmail == request.auth.token.email);
     }
 
     match /sharedLinks/{token} {

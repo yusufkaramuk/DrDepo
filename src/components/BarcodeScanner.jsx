@@ -41,8 +41,22 @@ async function stopScanner(scanner) {
 export function BarcodeScanner({ onResult, onClose }) {
   const [status, setStatus] = useState('starting');
   const [errorMsg, setErrorMsg] = useState('');
+  const [manualInput, setManualInput] = useState('');
+  const [showManualInput, setShowManualInput] = useState(false);
   const scannerRef = useRef(null);
   const resultHandled = useRef(false);
+
+  const handleManualSubmit = () => {
+    const trimmed = manualInput.trim();
+    if (trimmed.length >= 8) {
+      if (resultHandled.current) return;
+      resultHandled.current = true;
+      setStatus('success');
+      stopScanner(scannerRef.current);
+      scannerRef.current = null;
+      onResult(trimmed);
+    }
+  };
 
   useEffect(() => {
     let rafId = null;
@@ -179,6 +193,31 @@ export function BarcodeScanner({ onResult, onClose }) {
               </button>
             </div>
           )}
+
+          <div className="mt-3 border-t border-slate-100 dark:border-slate-800 pt-3">
+            {showManualInput ? (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={manualInput}
+                  onChange={e => setManualInput(e.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder="Barkod numarasını girin..."
+                  className="flex-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-[13px] text-slate-900 dark:text-slate-100 outline-none focus:border-[var(--brand-500)] focus:ring-2 focus:ring-[var(--brand-100)]"
+                  maxLength={13}
+                  onKeyDown={e => e.key === 'Enter' && handleManualSubmit()}
+                />
+                <button type="button" onClick={handleManualSubmit}
+                  className="px-4 py-2 rounded-xl bg-[var(--brand-600)] text-white text-[13px] font-medium hover:bg-[var(--brand-700)] transition-colors">
+                  Ara
+                </button>
+              </div>
+            ) : (
+              <button type="button" onClick={() => setShowManualInput(true)}
+                className="text-[12.5px] font-medium text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 underline underline-offset-2 transition-colors">
+                Barkod numarasını elle gir
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

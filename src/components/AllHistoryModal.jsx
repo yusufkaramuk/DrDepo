@@ -65,7 +65,7 @@ export function AllHistoryModal({ userId, medicines, onClose }) {
       }
     };
     load();
-  }, [userId]);
+  }, [userId, medicines]);
 
   const filtered = search.trim()
     ? logs.filter(l => l.medicineName?.toLowerCase().includes(search.toLowerCase()))
