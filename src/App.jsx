@@ -1198,15 +1198,8 @@ function App() {
           </div>
         )}
 
-        <div className="mt-10 pb-4 text-center text-[11.5px] text-slate-400 dark:text-slate-600 flex flex-col items-center gap-1.5">
-          <span>İlaç Takip Sistemi · Verileriniz {useCloud ? 'bulutta şifreli' : 'cihazınızda yerel olarak'} saklanır</span>
-          <div className="flex items-center gap-3">
-            <button onClick={() => setShowPrivacy(true)} className="hover:text-slate-600 dark:hover:text-slate-400 underline underline-offset-2 transition-colors">Gizlilik Politikası</button>
-            <span>·</span>
-            <button onClick={() => setShowTerms(true)} className="hover:text-slate-600 dark:hover:text-slate-400 underline underline-offset-2 transition-colors">Kullanım Koşulları</button>
-          </div>
-        </div>
       </main>
+
 
       {/* Mobile FAB */}
       <button
