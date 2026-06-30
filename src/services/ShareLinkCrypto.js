@@ -42,7 +42,6 @@ export async function encryptShareData(data, key) {
   combined.set(new Uint8Array(cipher), 12);
   return btoa(String.fromCharCode(...combined));
 }
-
 /**
  * Base64 şifreli string → orijinal nesne
  */

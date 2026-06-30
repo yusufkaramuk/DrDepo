@@ -24,9 +24,10 @@ import { FamilyModal } from './components/FamilyModal';
 import { PrivacyModal, TermsModal } from './components/LegalModal';
 import { PrivacyPolicy, TermsOfService } from './components/LegalPages';
 import { FamilyService } from './services/FamilyService';
-import { clearKeyCache } from './services/EncryptionService';
+import { clearKeyCache, setPassphraseRequestHandler } from './services/EncryptionService';
 import { AddedMedicineSuccessModal } from './components/AddedMedicineSuccessModal';
 import { SettingsModal } from './components/SettingsModal';
+import { PassphraseModal } from './components/PassphraseModal';
 import appLogo from './assets/logo.png';
 
 // ── Icons (inline SVG, matches design handoff) ──────────────────────────────
@@ -448,6 +449,14 @@ function App() {
   const [addedSuccessData, setAddedSuccessData] = useState(null); // { addedMed }
   const [deletingMedicine, setDeletingMedicine] = useState(null);
   const [showFamilyModal, setShowFamilyModal] = useState(false);
+  const [passphraseRequest, setPassphraseRequest] = useState(null);
+
+  // Modal handler subscription
+  useEffect(() => {
+    setPassphraseRequestHandler((isNew, isRetry) => {
+      setPassphraseRequest({ isNew, isRetry });
+    });
+  }, []);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const exportMenuRef = useRef(null);
   const [showPrivacy, setShowPrivacy] = useState(false);
@@ -1229,16 +1238,16 @@ function App() {
         onConfirm={handleDeleteConfirm}
       />
 
-      {/* Auth modal (cloud toggle when logged out) */}
-      {showAuthModal && (
-        <AuthModal
-          isOpen={showAuthModal}
-          onClose={() => setShowAuthModal(false)}
-          onAuth={handleAuth}
+      {passphraseRequest && (
+        <PassphraseModal 
+          isNew={passphraseRequest.isNew} 
+          isRetry={passphraseRequest.isRetry} 
+          onClose={() => setPassphraseRequest(null)}
         />
       )}
 
-
+      {/* Auth */}
+      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} onAuth={handleAuth} />
 
       {/* Family Modal */}
       {showFamilyModal && user && (

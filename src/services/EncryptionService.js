@@ -148,15 +148,39 @@ async function deleteEncKey(storeId) {
   } catch { /* sessizce geç */ }
 }
 
-// Parolayı prompt ile al — hiçbir yere kaydetme
-function getPassphrase() {
-  const passphrase = window.prompt(
-    'Verileriniz uçtan uca şifrelenir. Lütfen kurtarma parolanızı girin veya yeni hesap için güçlü bir kurtarma parolası belirleyin. Bu parola unutulursa şifreli veriler kurtarılamaz.'
-  );
-  if (!passphrase || passphrase.length < 8) {
-    throw new Error('Kurtarma parolası en az 8 karakter olmalıdır.');
-  }
-  return passphrase;
+let passphraseRequestResolver = null;
+let passphraseRequestRejecter = null;
+let onPassphraseRequested = null;
+
+// React uygulamasının (App.jsx) abone olması için
+export function setPassphraseRequestHandler(handler) {
+  onPassphraseRequested = handler;
+}
+
+export function resolvePassphraseRequest(passphrase) {
+  if (passphraseRequestResolver) passphraseRequestResolver(passphrase);
+  passphraseRequestResolver = null;
+  passphraseRequestRejecter = null;
+}
+
+export function rejectPassphraseRequest(reason) {
+  if (passphraseRequestRejecter) passphraseRequestRejecter(new Error(reason || 'CANCELLED'));
+  passphraseRequestResolver = null;
+  passphraseRequestRejecter = null;
+}
+
+// isNew: true ise yeni kullanıcı için şifre belirleme, false ise mevcut şifreyi girme
+// isRetry: true ise önceki şifre denemesi hatalıydı (yanlış şifre)
+async function getPassphraseAsync(isNew, isRetry = false) {
+  return new Promise((resolve, reject) => {
+    passphraseRequestResolver = resolve;
+    passphraseRequestRejecter = reject;
+    if (onPassphraseRequested) {
+      onPassphraseRequested(isNew, isRetry);
+    } else {
+      reject(new Error('Passphrase modal is not connected.'));
+    }
+  });
 }
 
 async function deriveVaultKey(passphrase, saltB64) {
@@ -230,19 +254,36 @@ async function getOrCreateUserKey(userId) {
     const userData = snap.exists() ? snap.data() : {};
     let b64Key = null;
 
-    if (userData.keyVault) {
-      b64Key = await openKeyVault(userData.keyVault, getPassphrase());
-    } else if (userData.encKey) {
-      b64Key = userData.encKey;
-      const keyVault = await createKeyVault(b64Key, getPassphrase());
-      await setDoc(userRef, { keyVault, encKey: deleteField() }, { merge: true });
-    }
+    let passphraseOk = false;
+    let isRetry = false;
 
-    if (!b64Key) {
-      const newKey = await generateKey();
-      b64Key = await exportKey(newKey);
-      const keyVault = await createKeyVault(b64Key, getPassphrase());
-      await setDoc(userRef, { keyVault }, { merge: true });
+    while (!passphraseOk) {
+      try {
+        const isNew = !userData.keyVault && !userData.encKey;
+
+        if (userData.keyVault) {
+          b64Key = await openKeyVault(userData.keyVault, await getPassphraseAsync(false, isRetry));
+        } else if (userData.encKey) {
+          b64Key = userData.encKey;
+          const keyVault = await createKeyVault(b64Key, await getPassphraseAsync(true, isRetry));
+          await setDoc(userRef, { keyVault, encKey: deleteField() }, { merge: true });
+        }
+
+        if (!b64Key) {
+          const newKey = await generateKey();
+          b64Key = await exportKey(newKey);
+          const keyVault = await createKeyVault(b64Key, await getPassphraseAsync(true, isRetry));
+          await setDoc(userRef, { keyVault }, { merge: true });
+        }
+        
+        passphraseOk = true;
+      } catch (err) {
+        if (err.message === 'CANCELLED' || err.message === 'Passphrase modal is not connected.') {
+          throw err;
+        }
+        // Parola yanlışsa (decryption failed) veya başka hataysa tekrar sor
+        isRetry = true;
+      }
     }
 
     // 3) Türetilen CryptoKey'i extractable:false ile IndexedDB'ye kaydet
