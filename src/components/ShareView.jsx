@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../services/FirebaseClient';
+import { deriveKeyFromToken, decryptShareData } from '../services/ShareLinkCrypto';
 
 const TR_MONTHS = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
 function fmtExpiry(s) { if (!s) return '—'; const [y, m] = s.split('-'); return `${TR_MONTHS[+m - 1]} ${y}`; }
@@ -25,8 +26,8 @@ const STATUS_STYLE = {
 };
 const DOT = { expired: 'bg-rose-500', warning: 'bg-amber-500', soon: 'bg-sky-500', good: 'bg-emerald-500', unknown: 'bg-slate-400' };
 
-export function ShareView({ token }) {
-  const [state, setState] = useState('loading'); // loading | found | expired | invalid
+export function ShareView({ token, encKey }) {
+  const [state, setState] = useState('loading'); // loading | found | expired | invalid | nokey
   const [medicine, setMedicine] = useState(null);
 
   useEffect(() => {
@@ -35,13 +36,20 @@ export function ShareView({ token }) {
       try {
         const linkDoc = await getDoc(doc(db, `sharedLinks/${token}`));
         if (!linkDoc.exists()) { setState('invalid'); return; }
-        const { expiresAt, medicine, medicineId } = linkDoc.data();
+        const { expiresAt, encryptedMedicine, medicine: legacyMedicine, medicineId } = linkDoc.data();
 
         if (expiresAt && new Date(expiresAt) < new Date()) { setState('expired'); return; }
 
-        // medicine verisi sharedLinks içinde gömülü (yeni format)
-        if (medicine) {
-          setMedicine({ id: medicineId, ...medicine });
+        if (encryptedMedicine) {
+          // Yeni format: şifreli veri — URL #fragment'taki token ile çöz
+          const keyToken = encKey || token; // fragment yoksa token'ı dene
+          if (!keyToken) { setState('nokey'); return; }
+          const cryptoKey = await deriveKeyFromToken(keyToken);
+          const decrypted = await decryptShareData(encryptedMedicine, cryptoKey);
+          setMedicine({ id: medicineId, ...decrypted });
+        } else if (legacyMedicine) {
+          // Eski format: şifresiz (geriye dönük uyumluluk)
+          setMedicine({ id: medicineId, ...legacyMedicine });
         } else {
           setState('invalid');
           return;
@@ -50,7 +58,8 @@ export function ShareView({ token }) {
       } catch { setState('invalid'); }
     };
     load();
-  }, [token]);
+  }, [token, encKey]);
+
 
   const st = medicine ? statusOf(medicine.expiryDate) : null;
   const ingredients = medicine ? [medicine.activeIngredient1, medicine.activeIngredient2, medicine.activeIngredient3].filter(Boolean) : [];
@@ -80,7 +89,15 @@ export function ShareView({ token }) {
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 p-8 text-center shadow-sm">
             <div className="text-[40px] mb-3">🔗</div>
             <div className="text-[17px] font-semibold text-slate-900 dark:text-slate-100">Link bulunamadı</div>
-            <div className="text-[13.5px] text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-2">Bu paylaşım linki geçersiz veya silinmiş.</div>
+            <div className="text-[13.5px] text-slate-500 dark:text-slate-400 mt-2">Bu paylaşım linki geçersiz veya silinmiş.</div>
+          </div>
+        )}
+
+        {state === 'nokey' && (
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-amber-200 dark:border-amber-800 p-8 text-center shadow-sm">
+            <div className="text-[40px] mb-3">🔐</div>
+            <div className="text-[17px] font-semibold text-slate-900 dark:text-slate-100">Veri şifrelenmiş</div>
+            <div className="text-[13.5px] text-slate-500 dark:text-slate-400 mt-2">Tam linki kullanın — paylaşım linki kesilmiş veya eksik.</div>
           </div>
         )}
 
@@ -143,6 +160,10 @@ export function ShareView({ token }) {
 
         <div className="mt-4 text-center text-[12px] text-slate-400 dark:text-slate-500">
           İlaç Takip · Salt okunur paylaşım
+        </div>
+        <div className="mt-3 flex justify-center gap-4 text-[11px] text-slate-400 dark:text-slate-500">
+          <a href="/gizlilik" className="hover:underline hover:text-slate-600 dark:hover:text-slate-300">Gizlilik Politikası</a>
+          <a href="/kosullar" className="hover:underline hover:text-slate-600 dark:hover:text-slate-300">Kullanım Koşulları</a>
         </div>
       </div>
     </div>

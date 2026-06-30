@@ -11,6 +11,7 @@ import { useTheme } from './context/ThemeContext';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from './services/FirebaseClient';
+import { deriveKeyFromToken, encryptShareData } from './services/ShareLinkCrypto';
 import { NotificationService } from './services/NotificationService';
 import { MedicineCard } from './components/MedicineCard';
 import { AddMedicineModal } from './components/AddMedicineModal';
@@ -21,6 +22,7 @@ import { AuthModal } from './components/AuthModal';
 import { ShareView } from './components/ShareView';
 import { FamilyModal } from './components/FamilyModal';
 import { PrivacyModal, TermsModal } from './components/LegalModal';
+import { PrivacyPolicy, TermsOfService } from './components/LegalPages';
 import { FamilyService } from './services/FamilyService';
 import { clearKeyCache } from './services/EncryptionService';
 import { AddedMedicineSuccessModal } from './components/AddedMedicineSuccessModal';
@@ -381,14 +383,20 @@ function App() {
   const { theme, toggle: toggleTheme } = useTheme();
   const isOnline = useNetworkStatus();
 
-  // /share/:token route — auth gerektirmez
-  const shareToken = window.location.pathname.startsWith('/share/')
+  // /share/:token route — auth gerektirmez; anahtar URL #fragment ile taşınır
+  const sharePath = window.location.pathname.startsWith('/share/')
     ? window.location.pathname.split('/share/')[1]
     : null;
-  if (shareToken) return <ShareView token={shareToken} />;
-  const [swUpdateReady, setSwUpdateReady] = useState(false);
+  const shareKey = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : null;
+  if (sharePath) return <ShareView token={sharePath} encKey={shareKey} />;
+
+  // Yasal sayfa rotaları
+  const path = window.location.pathname;
+  if (path === '/gizlilik') return <PrivacyPolicy />;
+  if (path === '/kosullar') return <TermsOfService />;
 
   const [medicines, setMedicines] = useState([]);
+  const [swUpdateReady, setSwUpdateReady] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'expired' | 'warning' | 'good'
@@ -660,29 +668,39 @@ function App() {
   const handleShare = async (medicine) => {
     if (!user) return;
     try {
+      // 32 hex karakter = 16 byte rastgele token
       const token = Array.from(crypto.getRandomValues(new Uint8Array(16)))
         .map(b => b.toString(16).padStart(2, '0')).join('');
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-      // İlaç verisini sharedLinks dökümanına gömüyoruz — başka kullanıcı medicines okuyamaz
+      // Token'dan AES-256-GCM anahtarı türet
+      const cryptoKey = await deriveKeyFromToken(token);
+
+      // İlaç verisini şiftrele
+      const plainMedicine = {
+        name: medicine.name || '',
+        quantity: medicine.quantity || '',
+        expiryDate: medicine.expiryDate || '',
+        activeIngredient1: medicine.activeIngredient1 || '',
+        activeIngredient2: medicine.activeIngredient2 || '',
+        activeIngredient3: medicine.activeIngredient3 || '',
+        notes: medicine.notes || '',
+        tags: medicine.tags || [],
+      };
+      const encryptedMedicine = await encryptShareData(plainMedicine, cryptoKey);
+
+      // Firestore'a yalnızca şifreli veri yaz — açık metin hiç yok
       await setDoc(doc(db, `sharedLinks/${token}`), {
         userId: user.uid,
         medicineId: medicine.id,
         expiresAt,
         createdAt: new Date().toISOString(),
-        medicine: {
-          name: medicine.name || '',
-          quantity: medicine.quantity || '',
-          expiryDate: medicine.expiryDate || '',
-          activeIngredient1: medicine.activeIngredient1 || '',
-          activeIngredient2: medicine.activeIngredient2 || '',
-          activeIngredient3: medicine.activeIngredient3 || '',
-          notes: medicine.notes || '',
-          tags: medicine.tags || [],
-        },
+        encryptedMedicine, // Şifreli
+        // 'medicine' alanı artık yok
       });
 
-      const url = `${window.location.origin}/share/${token}`;
+      // Anahtar URL #fragment kısmında — sunucu loglarına düşmez
+      const url = `${window.location.origin}/share/${token}#${token}`;
       await navigator.clipboard.writeText(url);
       showToast('success', 'Paylaşım linki kopyalandı (7 gün geçerli)');
     } catch {
@@ -1303,6 +1321,18 @@ function App() {
 
       {/* Toast */}
       {toast && <Toast kind={toast.kind} onClose={() => setToast(null)}>{toast.text}</Toast>}
+
+      {/* Legal Footer */}
+      <footer className="mt-8 pb-6 text-center text-[11.5px] text-slate-400 dark:text-slate-500 space-y-1">
+        <p>İlaç Takip · Ev kullanımı ve eğitim amaçlıdır · Tıbbi tavsiye değildir</p>
+        <div className="flex justify-center gap-4">
+          <a href="/gizlilik" className="hover:underline hover:text-slate-600 dark:hover:text-slate-300 transition-colors">Gizlilik Politikası</a>
+          <span className="text-slate-300 dark:text-slate-600">·</span>
+          <a href="/kosullar" className="hover:underline hover:text-slate-600 dark:hover:text-slate-300 transition-colors">Kullanım Koşulları</a>
+          <span className="text-slate-300 dark:text-slate-600">·</span>
+          <span>© {new Date().getFullYear()} Yusuf Karamuk</span>
+        </div>
+      </footer>
     </div>
   );
 }
