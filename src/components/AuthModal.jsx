@@ -23,6 +23,8 @@ export const AuthModal = ({ isOpen, onClose, onAuth }) => {
   const [verificationSent, setVerificationSent] = useState(false);
   const [cooldownUntil, setCooldownUntil] = useState(0);
   const [now, setNow] = useState(Date.now());
+  const [consentAccepted, setConsentAccepted] = useState(false);
+  const [showDisclaimer, setShowDisclaimer] = useState(false);
 
   useEffect(() => {
     if (now >= cooldownUntil) return undefined;
@@ -35,7 +37,7 @@ export const AuthModal = ({ isOpen, onClose, onAuth }) => {
 
   const startCooldown = () => { const next = Date.now() + AUTH_COOLDOWN_MS; setNow(Date.now()); setCooldownUntil(next); };
 
-  const resetForm = () => { setFormData({ email: '', password: '', displayName: '', confirmPassword: '' }); setError(''); setInfo(''); };
+  const resetForm = () => { setFormData({ email: '', password: '', displayName: '', confirmPassword: '' }); setError(''); setInfo(''); setConsentAccepted(false); };
 
   const handleGoogleSignIn = async () => {
     setError(''); setLoading(true);
@@ -68,6 +70,7 @@ export const AuthModal = ({ isOpen, onClose, onAuth }) => {
     if (isSignUp) {
       if (!formData.displayName.trim()) { setError('Isim soyisim gereklidir'); return; }
       if (formData.password !== formData.confirmPassword) { setError('Sifreler eslesmiyor'); return; }
+      if (!consentAccepted) { setError('Devam edebilmek için Kullanım Koşulları ve Sorumluluk Reddi metnini kabul etmelisiniz.'); return; }
     }
 
     try {
@@ -254,6 +257,39 @@ export const AuthModal = ({ isOpen, onClose, onAuth }) => {
                     </FieldWrap>
                   )}
                 </>
+              )}
+
+              {/* Sorumluluk Reddi & KVKK onay kutusu - yalnızca kayıt ekranında */}
+              {isSignUp && !resetMode && (
+                <div className="mt-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 p-3 space-y-2">
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={consentAccepted}
+                      onChange={e => setConsentAccepted(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-[var(--brand-600)] focus:ring-[var(--brand-500)] cursor-pointer"
+                    />
+                    <span className="text-[12px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                      <button type="button" onClick={() => setShowDisclaimer(v => !v)} className="font-semibold text-[var(--brand-600)] hover:underline">
+                        Kullanım Koşulları ve Sorumluluk Reddi Beyanı
+                      </button>'nı okudum ve kabul ediyorum.
+                      <span className="block mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">KVKK kapsamında kişisel sağlık verilerimin işlenmesine onay veriyorum.</span>
+                    </span>
+                  </label>
+
+                  {showDisclaimer && (
+                    <div className="mt-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 p-3 text-[11.5px] text-slate-600 dark:text-slate-300 leading-relaxed space-y-2 max-h-48 overflow-y-auto">
+                      <p className="font-semibold text-slate-800 dark:text-slate-100">📋 Sorumluluk Reddi & Kullanım Koşulları</p>
+                      <p><strong>1. Amaç ve Kapsam:</strong> Bu uygulama, kişisel ilaç stoğunuzu takip etmenize yardımcı olmak amacıyla tasarlanmış bir <strong>ev kullanımı ve eğitim amaçlı</strong> bireysel organizasyon aracıdır.</p>
+                      <p><strong>2. Tıbbi Tavsiye Değildir:</strong> Bu uygulama bir sağlık hizmeti ya da tıbbi cihaz değildir. Sunulan hiçbir bilgi, tıbbi tanı, tedavi tavsiyesi veya ilaç reçetesi yerine geçmez. Her türlü sağlık kararı için mutlaka bir hekim veya eczacıya danışınız.</p>
+                      <p><strong>3. Sorumluluk Reddi:</strong> Geliştirici(ler), uygulamanın kullanımından kaynaklanabilecek geç alınan ilaç, yanlış doz, son kullanma tarihi hatası veya başka herhangi bir sağlık sorununa dair hiçbir hukuki sorumluluk kabul etmez.</p>
+                      <p><strong>4. Kişisel Veri (KVKK):</strong> Kayıt sırasında toplanan ad-soyad ve e-posta adresi ile girdiğiniz ilaç bilgileri 6698 sayılı KVKK kapsamında işlenmektedir. Verileriniz yalnızca uygulamanın çalışması amacıyla kullanılır, üçüncü taraflarla paylaşılmaz ve uçtan uca şifreleme (AES-256) ile korunur.</p>
+                      <p><strong>5. Veri Silme:</strong> Hesabınızı sildiğinizde tüm verileriniz kalıcı olarak silinir.</p>
+                      <p><strong>6. Yaş Sınırı:</strong> Bu uygulamayı kullanmak için 18 yaşında veya daha büyük olmanız gerekmektedir.</p>
+                      <p className="text-[10.5px] text-slate-400 dark:text-slate-500 pt-1">Son güncelleme: Haziran 2026</p>
+                    </div>
+                  )}
+                </div>
               )}
 
               <button type="submit" disabled={loading || isCooldownActive}
