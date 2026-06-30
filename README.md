@@ -22,10 +22,11 @@ Modern, güvenli ve kullanıcı dostu bir web uygulaması. Evinizdeki ilaçları
 - Gelişmiş silme: gruptan istediğiniz kadar ilacı seçerek silin
 - Etiket sistemi: ilaçlara özel etiket ekleyin ve etiketle filtreleyin
 
-### Barkod Tarama & TİTCK Entegrasyonu
-- Kamera ile barkod okuma
+### Karekod (QR) & Barkod Tarama ve TİTCK Entegrasyonu
+- İlaç ekleme ve Toplu Ekleme ekranlarında Karekod (QR) ve normal Barkod okuma seçeneği
 - 22.000+ ilaç kaydı içeren TİTCK veritabanı ile otomatik eşleştirme
-- Barkod okunduğunda ticari ad, doz, form ve etken maddeler otomatik doldurulur
+- Barkod/Karekod okunduğunda ticari ad, doz, form ve etken maddeler otomatik doldurulur
+- Karekod okunduğunda Son Kullanım Tarihi otomatik ayıklanır
 - Veriler IndexedDB'de önbelleğe alınır — offline çalışır
 
 ### Aile Modu
@@ -42,13 +43,8 @@ Modern, güvenli ve kullanıcı dostu bir web uygulaması. Evinizdeki ilaçları
 
 ### Son Kullanma Takibi
 - Otomatik renk uyarıları: Kırmızı (geçmiş) · Turuncu (30 gün) · Yeşil (güvenli)
-- Ay/Yıl formatında pratik tarih girişi
-- Türkçe tarih gösterimi ve kalan gün sayacı
-
-### Kullanım Geçmişi
-- Her ilaç için kullanım kaydı: kullanıldı, bitti, eklendi, düzenlendi
-- İsteğe bağlı not eklenebilir
-- Tüm kullanıcı geçmişini tek ekranda görme
+- Ay/Yıl formatında sayısal (Örn: 05 / 2026) pratik tarih girişi
+- Türkçe metin tarih gösterimi ve kalan gün sayacı
 
 ### Push Bildirimleri
 - Son kullanma tarihi yaklaşan ilaçlar için otomatik bildirim
@@ -70,8 +66,10 @@ Modern, güvenli ve kullanıcı dostu bir web uygulaması. Evinizdeki ilaçları
 - Offline çalışma desteği (IndexedDB + Service Worker)
 - Responsive tasarım (mobil ve masaüstü)
 
-### Arayüz
-- Karanlık mod / Açık mod
+### Arayüz ve Kişiselleştirme
+- Gelişmiş Karanlık Mod (Dark Mode) / Açık Mod
+- Kullanıcı Ayarları paneli (Şifre değiştirme)
+- Dinamik Yazı Boyutu ayarı (Responsive tipografi)
 - Liste ve grid görünümü
 - Türkçe arayüz
 
@@ -198,15 +196,16 @@ ilacStokTakipSistemi/
 ├── src/
 │   ├── components/
 │   │   ├── AddMedicineModal.jsx     # İlaç ekleme/düzenleme
-│   │   ├── AllHistoryModal.jsx      # Tüm kullanım geçmişi
+│   │   ├── AddedMedicineSuccessModal.jsx # Başarılı ekleme uyarısı
 │   │   ├── AuthModal.jsx            # Giriş/Kayıt
 │   │   ├── BarcodeScanner.jsx       # Kamera barkod okuyucu
-│   │   ├── BulkAddModal.jsx         # Toplu JSON import
+│   │   ├── BulkAddModal.jsx         # Toplu JSON import ve barkod ekleme
 │   │   ├── DeleteModal.jsx          # Silme onay
 │   │   ├── FamilyModal.jsx          # Aile modu yönetimi
 │   │   ├── MedicineCard.jsx         # İlaç kartı
+│   │   ├── MonthYearPicker.jsx      # Sayısal ay ve yıl seçici
+│   │   ├── SettingsModal.jsx        # Kullanıcı ayarları (Yazı boyutu, şifre)
 │   │   ├── ShareView.jsx            # Paylaşım link görünümü
-│   │   ├── UsageHistoryModal.jsx    # İlaç kullanım geçmişi
 │   │   └── ui/
 │   │       └── BaseComponents.jsx   # Ortak UI bileşenleri
 │   ├── config/
@@ -254,6 +253,12 @@ npm run test:security  # Tam güvenlik kontrolü
 ---
 
 ## Changelog
+
+### v2.4.0
+- **Karekod (QR) Tarama**: Toplu ilaç ekleme menüsüne ve ana menüye gelişmiş Karekod tarama eklendi.
+- **Kullanıcı Ayarları**: Şifre değiştirme ve dinamik yazı boyutu büyültme/küçültme özelliği eklendi.
+- **Arayüz İyileştirmeleri**: Tarih seçimi sayısal sisteme (MonthYearPicker) geçirildi. Karanlık tema (Dark Mode) eksikleri tamamen giderildi. 
+- **Sadeleştirme**: Kullanım geçmişi özellikleri sistemden çıkarılarak arayüz temizlendi.
 
 ### v2.3.0
 - **Aile Modu**: e-posta daveti, aile üyesi ilaç görüntüleme, Özel İlaç gizleme
