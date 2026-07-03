@@ -2,7 +2,7 @@
 
 Modern, güvenli ve kullanıcı dostu bir web uygulaması. Evinizdeki ilaçları dijital ortamda takip edin, son kullanma tarihlerini kontrol edin ve aile üyeleriyle paylaşın.
 
-**Kullanmak İçin:** [https://medidepo.org.tr)
+**Kullanmak İçin:** https://medidepo.org.tr
 
 ---
 
