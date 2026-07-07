@@ -77,83 +77,17 @@ Modern, güvenli ve kullanıcı dostu bir web uygulaması. Evinizdeki ilaçları
 
 ---
 
-## Hızlı Başlangıç
+## Kaynak Kod ve Kullanım Şartları
 
-### Ön Gereksinimler
-- Node.js 18+
-- Firebase hesabı (ücretsiz)
+DrDepo, kaynak kodu görüntülenebilir özel mülkiyetli (source-available proprietary) bir yazılımdır ve açık kaynak değildir.
 
-### Kurulum
+Kaynak kodu; teknik inceleme, şeffaflık ve portföy/referans amaçlarıyla GitHub üzerinde herkese açık olarak görüntülenebilir.
 
-**1. Projeyi klonlayın**
-```bash
-git clone https://github.com/yusufkaramuk/DrDepo.git
-cd DrDepo
-```
+GitHub'ın veya kullanılan barındırma platformunun işlevleri ve şartları kapsamında zorunlu olarak sağlanan sınırlı haklar dışında, kaynak kodunun herkese açık olması; kodu kopyalama, değiştirme, uyarlama, deploy etme, barındırma, dağıtma, yeniden yayınlama, yeniden markalama, ticari olarak kullanma veya Yazılımı ya da esaslı bir bölümünü başka bir uygulama, servis, yazılım ürünü veya türev çalışmanın temeli olarak kullanma izni vermez.
 
-Eski repo adıyla klonlanmış mevcut bir klasörde çalışıyorsanız, `git pull` öncesi remote adresini güncelleyin:
-```bash
-git remote set-url origin https://github.com/yusufkaramuk/DrDepo.git
-git pull origin main
-```
+Kod katkısı, yeniden kullanım veya ticari lisanslama talepleri için proje sahibinden önceden yazılı izin alınmalıdır. Geliştirme ve production deployment dokümantasyonu herkese açık olarak sunulmamaktadır.
 
-**2. Bağımlılıkları yükleyin**
-```bash
-npm install
-```
-
-**3. Firebase yapılandırması**
-
-`.env.example` dosyasını `.env` olarak kopyalayın:
-```bash
-cp .env.example .env
-```
-
-Firebase bilgilerinizi `.env` dosyasına girin:
-```env
-VITE_FIREBASE_API_KEY=your_api_key
-VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your_project_id
-VITE_FIREBASE_STORAGE_BUCKET=your_project.firebasestorage.app
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-VITE_FIREBASE_APP_ID=your_app_id
-
-# Opsiyonel — Firebase App Check
-VITE_RECAPTCHA_V3_SITE_KEY=your_recaptcha_key
-VITE_ENABLE_APP_CHECK=true
-
-# Opsiyonel — Web Push bildirimleri (VAPID)
-VITE_VAPID_PUBLIC_KEY=your_vapid_public_key
-
-# Opsiyonel — Firebase Emulators (yerel geliştirme)
-VITE_USE_FIREBASE_EMULATORS=false
-```
-
-**4. Kurulum kılavuzları**
-- [docs/FIREBASE_SETUP.md](docs/FIREBASE_SETUP.md) — Firebase proje kurulumu
-- [docs/AUTHENTICATION_SETUP.md](docs/AUTHENTICATION_SETUP.md) — Authentication aktifleştirme
-- [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md) — Production deployment
-
-**5. Uygulamayı başlatın**
-```bash
-npm run dev
-```
-
-Tarayıcınızda `http://localhost:5173` adresini açın.
-
----
-
-## Deployment
-
-```bash
-npm run build
-npx firebase deploy
-```
-
-TİTCK ilaç veritabanını güncellemek için:
-```bash
-node scripts/fetch-titck-data.js
-```
+Geçerli kullanım şartları için [LICENSE.md](LICENSE.md) dosyasını inceleyin.
 
 ---
 
@@ -190,57 +124,16 @@ node scripts/fetch-titck-data.js
 
 ---
 
-## Proje Yapısı
+## Yüksek Seviyeli Mimari
 
-```
-DrDepo/
-├── docs/                            # Kurulum ve deployment kılavuzları
-├── public/
-│   ├── manifest.json                # PWA manifest
-│   └── sw.js                        # Service Worker
-├── scripts/
-│   ├── fetch-titck-data.js          # TİTCK Excel → medicines.json
-│   └── send-notifications.js        # Push bildirim gönderici
-├── src/
-│   ├── components/
-│   │   ├── AddMedicineModal.jsx     # İlaç ekleme/düzenleme
-│   │   ├── AddedMedicineSuccessModal.jsx # Başarılı ekleme uyarısı
-│   │   ├── AuthModal.jsx            # Giriş/Kayıt
-│   │   ├── BarcodeScanner.jsx       # Kamera barkod okuyucu
-│   │   ├── BulkAddModal.jsx         # Toplu JSON import ve barkod ekleme
-│   │   ├── DeleteModal.jsx          # Silme onay
-│   │   ├── FamilyModal.jsx          # Aile modu yönetimi
-│   │   ├── MedicineCard.jsx         # İlaç kartı
-│   │   ├── MonthYearPicker.jsx      # Sayısal ay ve yıl seçici
-│   │   ├── SettingsModal.jsx        # Kullanıcı ayarları (Yazı boyutu, şifre)
-│   │   ├── ShareView.jsx            # Paylaşım link görünümü
-│   │   └── ui/
-│   │       └── BaseComponents.jsx   # Ortak UI bileşenleri
-│   ├── config/
-│   │   └── firebase.js              # Firebase yapılandırması
-│   ├── services/
-│   │   ├── AuthService.js           # Firebase Auth işlemleri
-│   │   ├── CsvExport.js             # CSV dışa aktarma
-│   │   ├── FamilyService.js         # Aile modu işlemleri
-│   │   ├── FirebaseClient.js        # Firebase başlatma & App Check
-│   │   ├── FirebaseService.js       # Firestore CRUD
-│   │   ├── FuzzySearch.js           # Levenshtein arama
-│   │   ├── MedicineDatabase.js      # TİTCK IndexedDB yönetimi
-│   │   ├── MedicineValidation.js    # Veri doğrulama & normalize
-│   │   ├── NotificationService.js   # Web Push yönetimi
-│   │   └── StorageManager.js        # LocalStorage yönetimi
-│   ├── App.jsx                      # Ana uygulama bileşeni
-│   ├── main.jsx                     # Entry point
-│   └── index.css                    # Global stiller
-├── tests/
-│   └── firestore.rules.test.js      # Güvenlik kuralı testleri
-├── .env.example
-├── firebase.json
-├── firestore.indexes.json
-├── firestore.rules
-├── index.html
-└── package.json
-```
+DrDepo, React tabanlı bir PWA mimarisi kullanır.
+
+- **UI Katmanı** — responsive ve mobil öncelikli React arayüzü
+- **Kimlik ve Veri Katmanı** — Firebase Authentication ve Firestore
+- **Offline Katman** — IndexedDB ve Service Worker
+- **İlaç Veri Katmanı** — TİTCK verilerinin yerel önbellekleme ve eşleştirme akışı
+- **Bildirim Katmanı** — Web Push ve zamanlanmış kontroller
+- **Güvenlik Katmanı** — App Check, Firestore Security Rules ve doğrulama testleri
 
 ---
 
@@ -329,17 +222,9 @@ npm run test:security  # Tam güvenlik kontrolü
 
 ## Katkıda Bulunma
 
-1. Fork yapın
-2. Feature branch oluşturun (`git checkout -b feature/ozellik-adi`)
-3. Değişikliklerinizi commit edin (`git commit -m 'feat: Özellik açıklaması'`)
-4. Branch'inizi push edin (`git push origin feature/ozellik-adi`)
-5. Pull Request açın
+Hata bildirimi, öneri ve güvenlik geri bildirimleri issue üzerinden kabul edilir.
 
----
-
-## Lisans
-
-MIT License — ayrıntılar için [LICENSE](LICENSE) dosyasına bakın.
+Kod katkısı, yeniden kullanım veya lisanslama talepleri için önceden yazılı izin gereklidir. Geçerli kullanım şartları için [LICENSE.md](LICENSE.md) dosyasını inceleyin.
 
 ---
 
@@ -350,4 +235,4 @@ MIT License — ayrıntılar için [LICENSE](LICENSE) dosyasına bakın.
 
 ---
 
-> Bu proje ev kullanımı ve eğitim amaçlıdır.
+> DrDepo, kişisel ilaç envanteri ve son kullanma tarihi takibini kolaylaştırmak amacıyla geliştirilmiştir. Tıbbi tavsiye, teşhis veya tedavi hizmeti sunmaz. İlaç kullanımıyla ilgili kararlar için yetkili bir sağlık profesyoneline danışılmalıdır.
