@@ -1,8 +1,21 @@
 #!/usr/bin/env node
-// Günlük SKT yaklaşan ilaç bildirimi gönderme scripti
-// GitHub Actions'da çalışır, Firestore REST API ile veri okur, web-push ile bildirim gönderir
+// Günlük SKT (son kullanma tarihi) bildirimi gönderme scripti.
+// GitHub Actions'da çalışır; Firestore REST API ile okur, web-push ile gönderir.
+//
+// Kullanım: node scripts/send-notifications.js [--dry-run]
+//   --dry-run / DRY_RUN=1 : hiçbir bildirim gönderilmez, yalnızca sayaçlar loglanır.
+//
+// GÜVENLİK NOTLARI:
+// - İlaç adları Firestore'da istemci tarafında ŞİFRELİ saklanır (enc: öneki).
+//   Sunucu bunları çözemez; bu yüzden bildirim gövdesi yalnızca SAYI içerir.
+//   (Eski sürümün "anlamsız karakter" hatasının kök nedenlerinden biri buydu.)
+// - Endpoint, p256dh, auth veya userAgent asla loglanmaz; yalnızca anonim
+//   sayaçlar ve HTTP durum kodları loglanır.
 
 import webpush from 'web-push';
+import { getFirestoreToken, withRetry } from './lib/firestore-auth.js';
+import { listAll, getField, docId, deleteDoc } from './lib/firestore-values.js';
+import { buildNotificationPayload } from './lib/sanitize.js';
 
 const {
   VAPID_PUBLIC_KEY,
@@ -12,60 +25,75 @@ const {
   FIREBASE_SERVICE_ACCOUNT,
 } = process.env;
 
+const DRY_RUN = process.argv.includes('--dry-run') || process.env.DRY_RUN === '1' || process.env.DRY_RUN === 'true';
+
 if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || !FIREBASE_PROJECT_ID || !FIREBASE_SERVICE_ACCOUNT) {
   console.error('[Bildirim] Eksik environment variables. GitHub Secrets kontrol edin.');
   process.exit(1);
 }
 
-webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+webpush.setVapidDetails(VAPID_SUBJECT || 'mailto:noreply@drdepo.app', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
-// Firebase Admin SDK ile Firestore'dan veri çek
-async function getFirestoreToken(serviceAccount) {
-  const { private_key, client_email } = serviceAccount;
-  const now = Math.floor(Date.now() / 1000);
-  const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
-  const payload = Buffer.from(JSON.stringify({
-    iss: client_email,
-    sub: client_email,
-    aud: 'https://oauth2.googleapis.com/token',
-    iat: now,
-    exp: now + 3600,
-    scope: 'https://www.googleapis.com/auth/datastore',
-  })).toString('base64url');
-
-  const { createSign } = await import('crypto');
-  const sign = createSign('RSA-SHA256');
-  sign.update(`${header}.${payload}`);
-  const sig = sign.sign(private_key, 'base64url');
-  const jwt = `${header}.${payload}.${sig}`;
-
-  const res = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
-  });
-  const { access_token } = await res.json();
-  return access_token;
-}
-
-async function firestoreList(token, path) {
-  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${path}`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-  const data = await res.json();
-  return data.documents || [];
-}
-
-function getFieldValue(doc, field) {
-  const f = doc.fields?.[field];
-  return f?.stringValue ?? f?.integerValue ?? f?.arrayValue ?? null;
-}
-
-function statusOf(expiryDate) {
-  if (!expiryDate) return null;
+/** expiryDate 'YYYY-MM' → bugünden ay sonuna kalan gün sayısı. */
+function daysUntilExpiry(expiryDate) {
+  if (typeof expiryDate !== 'string' || !/^\d{4}-\d{2}$/.test(expiryDate)) return null;
   const now = new Date(); now.setHours(0, 0, 0, 0);
   const [y, m] = expiryDate.split('-').map(Number);
   const exp = new Date(y, m, 0); exp.setHours(23, 59, 59, 999);
   return Math.ceil((exp - now) / 86400000);
+}
+
+/** Abonelik dokümanlarını endpoint bazında tekilleştirir (eski+yeni ID geçişi emniyeti). */
+export function dedupeSubscriptions(subDocs) {
+  const byEndpoint = new Map();
+  for (const subDoc of subDocs) {
+    const endpoint = getField(subDoc, 'endpoint');
+    if (typeof endpoint !== 'string' || !endpoint.startsWith('https://')) continue;
+    const keys = getField(subDoc, 'keys');
+    if (!keys || typeof keys !== 'object' || !keys.p256dh || !keys.auth) continue;
+    const existing = byEndpoint.get(endpoint);
+    if (existing) {
+      existing.docIds.push(docId(subDoc));
+    } else {
+      byEndpoint.set(endpoint, {
+        endpoint,
+        keys: { p256dh: keys.p256dh, auth: keys.auth },
+        docIds: [docId(subDoc)],
+      });
+    }
+  }
+  return [...byEndpoint.values()];
+}
+
+/**
+ * Tek aboneliğe bildirim gönderir; 404/410'da Firestore dokümanlarını temizler.
+ * @returns {'sent'|'stale'|'failed'|'dry'}
+ */
+async function sendToSubscription(token, userId, sub, payloadJson) {
+  if (DRY_RUN) return 'dry';
+  try {
+    await withRetry(
+      () => webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, payloadJson),
+      { retries: 1 },
+    );
+    return 'sent';
+  } catch (err) {
+    const status = err.statusCode;
+    if (status === 404 || status === 410) {
+      // Süresi dolmuş abonelik: dokümanlarını (eski+yeni ID) temizle
+      for (const id of sub.docIds) {
+        if (!id) continue;
+        try {
+          await deleteDoc(token, FIREBASE_PROJECT_ID, `users/${userId}/pushSubscriptions/${id}`);
+        } catch {
+          // Temizlik hatası ölümcül değil; bir sonraki çalıştırmada yeniden denenir
+        }
+      }
+      return 'stale';
+    }
+    console.warn(`[Bildirim] Gönderim hatası (HTTP ${status ?? 'ağ'})`);
+    return 'failed';
+  }
 }
 
 async function main() {
@@ -78,55 +106,60 @@ async function main() {
   }
 
   const token = await getFirestoreToken(serviceAccount);
-  const users = await firestoreList(token, 'users');
-  console.log(`[Bildirim] ${users.length} kullanıcı bulundu`);
+  const users = await listAll(token, FIREBASE_PROJECT_ID, 'users');
+  console.log(`[Bildirim] ${users.length} kullanıcı bulundu${DRY_RUN ? ' (DRY RUN)' : ''}`);
 
-  let totalSent = 0;
+  const counters = { usersNotified: 0, sent: 0, stale: 0, failed: 0, dry: 0 };
 
   for (const userDoc of users) {
-    const userId = userDoc.name.split('/').pop();
+    const userId = docId(userDoc);
+    if (!userId) continue;
 
-    // Kullanıcının ilaçlarını çek
-    const medicines = await firestoreList(token, `users/${userId}/medicines`);
-    const expiring = medicines.filter(m => {
-      const d = statusOf(getFieldValue(m, 'expiryDate'));
-      return d !== null && d >= 0 && d <= 30;
-    });
+    try {
+      const medicines = await listAll(token, FIREBASE_PROJECT_ID, `users/${userId}/medicines`);
+      const expiring = medicines.filter(m => {
+        const d = daysUntilExpiry(getField(m, 'expiryDate'));
+        return d !== null && d >= 0 && d <= 30;
+      });
+      if (expiring.length === 0) continue;
 
-    if (expiring.length === 0) continue;
+      const subDocs = await listAll(token, FIREBASE_PROJECT_ID, `users/${userId}/pushSubscriptions`);
+      const subs = dedupeSubscriptions(subDocs);
+      if (subs.length === 0) continue;
 
-    // Kullanıcının push subscription'larını çek
-    const subs = await firestoreList(token, `users/${userId}/pushSubscriptions`);
-    if (subs.length === 0) continue;
+      // İlaç adları şifreli olduğundan bildirimde YALNIZCA sayı kullanılır.
+      const payload = buildNotificationPayload({
+        title: 'Son kullanma tarihi uyarısı',
+        body: expiring.length === 1
+          ? '1 ilacınızın son kullanma tarihi yaklaşıyor. Detay için uygulamayı açın.'
+          : `${expiring.length} ilacınızın son kullanma tarihi yaklaşıyor. Detay için uygulamayı açın.`,
+        tag: 'skt-uyari',
+        url: '/#/ilaclar?filtre=yaklasan',
+        type: 'expiry',
+      });
+      const payloadJson = JSON.stringify(payload);
 
-    const medicineNames = expiring.slice(0, 3).map(m => getFieldValue(m, 'name')).filter(Boolean);
-    const title = `${expiring.length} ilacınızın son kullanma tarihi yaklaşıyor`;
-    const body = medicineNames.join(', ') + (expiring.length > 3 ? ` ve ${expiring.length - 3} daha…` : '');
-
-    for (const subDoc of subs) {
-      const endpoint = getFieldValue(subDoc, 'endpoint');
-      const keysField = subDoc.fields?.keys?.mapValue?.fields;
-      if (!endpoint || !keysField) continue;
-
-      const subscription = {
-        endpoint,
-        keys: {
-          p256dh: keysField.p256dh?.stringValue,
-          auth: keysField.auth?.stringValue,
-        },
-      };
-
-      try {
-        await webpush.sendNotification(subscription, JSON.stringify({ title, body, tag: 'skt-uyari' }));
-        totalSent++;
-      } catch (err) {
-        // 410 Gone = subscription geçersiz, silmek gerekebilir (sessizce geç)
-        if (err.statusCode !== 410) console.warn('[Bildirim] Gönderim hatası:', err.statusCode);
+      let notified = false;
+      for (const sub of subs) {
+        const result = await sendToSubscription(token, userId, sub, payloadJson);
+        counters[result]++;
+        if (result === 'sent' || result === 'dry') notified = true;
       }
+      if (notified) counters.usersNotified++;
+    } catch (err) {
+      // Tek kullanıcı hatası tüm işi durdurmaz
+      console.warn(`[Bildirim] Kullanıcı işlenemedi (HTTP ${err.status ?? err.statusCode ?? '?'})`);
     }
   }
 
-  console.log(`[Bildirim] Tamamlandı — ${totalSent} bildirim gönderildi`);
+  console.log(
+    `[Bildirim] Tamamlandı — kullanıcı: ${counters.usersNotified}, gönderilen: ${counters.sent}, ` +
+    `temizlenen eski abonelik: ${counters.stale}, hata: ${counters.failed}` +
+    (DRY_RUN ? `, dry-run atlanan: ${counters.dry}` : ''),
+  );
 }
 
-main().catch(err => { console.error(err); process.exit(1); });
+main().catch(err => {
+  console.error('[Bildirim] Kritik hata:', err.message);
+  process.exit(1);
+});
