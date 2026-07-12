@@ -27,6 +27,8 @@ import { clearKeyCache, setPassphraseRequestHandler, EncryptionService } from '.
 import { AddedMedicineSuccessModal } from './components/AddedMedicineSuccessModal';
 import { SettingsModal } from './components/SettingsModal';
 import { PassphraseModal } from './components/PassphraseModal';
+import { useHashRoute } from './hooks/useHashRoute';
+import { BottomNav } from './components/layout/BottomNav';
 import appLogo from './assets/drdepo-logo.svg';
 
 const BarcodeScanner = lazy(() => import('./components/BarcodeScanner').then(m => ({ default: m.BarcodeScanner })));
@@ -379,18 +381,38 @@ const ProfileButton = ({ user, onShowSettings, onSignOut }) => {
   );
 };
 
-const Header = ({ user, totalCount, useCloud, onToggleCloud, syncing, onSignOut, theme, onToggleTheme, isOnline, notifPermission, onToggleNotifications, onShowFamily, pendingInviteCount, onShowSettings }) => (
+const Header = ({ user, totalCount, useCloud, onToggleCloud, syncing, onSignOut, theme, onToggleTheme, isOnline, notifPermission, onToggleNotifications, onShowFamily, pendingInviteCount, onShowSettings, tab, onNavigate }) => (
   <header className="sticky top-0 z-30 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-700/80">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
       <div className="flex items-center gap-3 min-w-0">
         <img src={appLogo} alt="" aria-hidden="true" className="w-14 h-14 sm:w-16 sm:h-16 object-contain shrink-0"/>
         <div className="leading-tight min-w-0">
           <div className="text-[18px] sm:text-[20px] font-semibold tracking-tight">
-            <span style={{ color: '#087269' }}>Dr</span><span style={{ color: '#1F272A' }}>Depo</span>
+            <span className="text-[var(--brand-600)]">Dr</span><span className="text-slate-900 dark:text-slate-100">Depo</span>
           </div>
           <div className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">{totalCount} kayıtlı ilaç · {user.displayName || user.email?.split('@')[0]}</div>
         </div>
       </div>
+
+      {/* Masaüstü sekmeleri */}
+      <nav aria-label="Ana gezinme" className="hidden md:flex items-center gap-1 ml-4">
+        {[
+          { k: 'anasayfa', l: 'Ana Sayfa' },
+          { k: 'ilaclar', l: 'İlaçlarım' },
+          { k: 'bildirimler', l: 'Bildirimler' },
+        ].map(t => (
+          <button key={t.k}
+            onClick={() => onNavigate?.(t.k)}
+            aria-current={tab === t.k ? 'page' : undefined}
+            className={`px-3.5 py-2 rounded-xl text-[13.5px] transition-colors min-h-[44px] ${
+              tab === t.k
+                ? 'bg-[var(--brand-50)] text-[var(--brand-700)] font-semibold'
+                : 'text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}>
+            {t.l}
+          </button>
+        ))}
+      </nav>
 
       <div className="flex-1"/>
 
@@ -458,6 +480,7 @@ const createLocalMedicine = (medicine) => ({
 function App() {
   const { theme, toggle: toggleTheme } = useTheme();
   const isOnline = useNetworkStatus();
+  const { tab, params: routeParams, navigate } = useHashRoute();
 
   // /share/:token route — auth gerektirmez; anahtar URL #fragment ile taşınır
   const sharePath = window.location.pathname.startsWith('/share/')
@@ -489,6 +512,13 @@ function App() {
     const t = setTimeout(() => setDebouncedSearch(searchTerm.trim().toLowerCase()), 300);
     return () => clearTimeout(t);
   }, [searchTerm]);
+
+  // Bildirimden gelen derin bağlantı: #/ilaclar?filtre=yaklasan
+  useEffect(() => {
+    if (tab === 'ilaclar' && routeParams.get('filtre') === 'yaklasan') {
+      setStatusFilter('warning');
+    }
+  }, [tab, routeParams]);
 
   // TITCK veritabanını arka planda güncelle
   useEffect(() => { MedicineDatabase.syncInBackground(); }, []);
@@ -1032,7 +1062,7 @@ function App() {
   const firstName = (user.displayName || user.email || 'Kullanıcı').split(' ')[0];
 
   return (
-    <div className="min-h-screen bg-slate-50/60 dark:bg-slate-950 pb-24" style={{
+    <div className="min-h-screen bg-slate-50/60 dark:bg-slate-950 pb-32 md:pb-24" style={{
       backgroundImage: 'radial-gradient(1200px 600px at 80% -10%, color-mix(in srgb, var(--brand-500) 8%, transparent), transparent), radial-gradient(800px 400px at -10% 0%, rgba(20,184,166,0.06), transparent)',
     }}>
       <Header
@@ -1050,6 +1080,8 @@ function App() {
         onShowFamily={() => setShowFamilyModal(true)}
         onShowSettings={() => setShowSettingsModal(true)}
         pendingInviteCount={pendingInviteCount}
+        tab={tab}
+        onNavigate={navigate}
       />
 
       {/* SW güncelleme bildirimi */}
@@ -1103,6 +1135,7 @@ function App() {
           </div>
         )}
 
+        {tab === 'anasayfa' && (<>
         {/* Hero / greeting */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
           <div>
@@ -1192,6 +1225,48 @@ function App() {
           <StatCard label="Güvenli Stokta"  value={stats.good}    sublabel="3 ay üstü süre"                             accent="emerald" icon={<Icon.Shield size={16}/>}/>
         </div>
 
+        {/* Yakında bitecekler önizlemesi (ana sayfa) */}
+        {(() => {
+          const upcoming = filteredMedicines
+            .map(m => ({ m, st: statusOf(m) }))
+            .filter(x => x.st.key === 'expired' || x.st.key === 'warning')
+            .sort((a, b) => (a.st.daysLeft ?? 0) - (b.st.daysLeft ?? 0))
+            .slice(0, 5);
+          return (
+            <section aria-labelledby="upcoming-title" className="mb-6">
+              <div className="flex items-center justify-between mb-3">
+                <h2 id="upcoming-title" className="text-[16px] font-semibold text-slate-900 dark:text-slate-100">Yakında bitecekler</h2>
+                <button onClick={() => navigate('ilaclar', { filtre: 'yaklasan' })}
+                  className="text-[13px] font-medium text-[var(--brand-600)] hover:underline min-h-[44px] px-2">
+                  Tümünü gör
+                </button>
+              </div>
+              {upcoming.length === 0 ? (
+                <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-5 py-6 text-[13.5px] text-slate-500 dark:text-slate-400 flex items-center gap-3">
+                  <span className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 grid place-items-center shrink-0"><Icon.Shield size={17}/></span>
+                  30 gün içinde süresi dolacak ilacınız yok. Stoğunuz güvende görünüyor.
+                </div>
+              ) : (
+                <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-800 shadow-[0_1px_0_rgba(15,23,42,0.04)]">
+                  {upcoming.map(({ m }) => (
+                    <MedicineRow key={m.id} medicine={m} onEdit={handleEdit} onDelete={handleDeleteRequest}/>
+                  ))}
+                </div>
+              )}
+            </section>
+          );
+        })()}
+        </>)}
+
+        {tab === 'bildirimler' && (
+          <section aria-label="Bildirim merkezi" className="mb-6">
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-5 py-10 text-center text-[14px] text-slate-500 dark:text-slate-400">
+              Bildirim merkezi hazırlanıyor…
+            </div>
+          </section>
+        )}
+
+        {tab === 'ilaclar' && (<>
         {/* Search + sort + view toggle */}
         <div className="flex flex-col sm:flex-row gap-3 mb-4">
           <div className="relative flex-1">
@@ -1288,17 +1363,30 @@ function App() {
             ))}
           </div>
         )}
+        </>)}
 
       </main>
 
 
-      {/* Mobile FAB */}
-      <button
-        onClick={() => { setEditingId(null); setModalInitialData(null); setIsAddModalOpen(true); }}
-        className="sm:hidden fixed bottom-5 right-5 z-30 w-14 h-14 rounded-full bg-[var(--brand-600)] text-white grid place-items-center shadow-[0_16px_30px_-8px_var(--brand-shadow)] active:scale-95 transition-transform"
-        aria-label="Yeni ilaç">
-        <Icon.Plus size={22}/>
-      </button>
+      {/* Mobile FAB — alt navigasyonun üzerinde, vurgu renginde (mockup) */}
+      {tab === 'ilaclar' && (
+        <button
+          onClick={() => { setEditingId(null); setModalInitialData(null); setIsAddModalOpen(true); }}
+          className="md:hidden fixed bottom-24 right-5 z-30 w-14 h-14 rounded-full bg-[var(--brand-accent)] text-white grid place-items-center shadow-float active:scale-95 transition-transform"
+          aria-label="Yeni ilaç ekle">
+          <Icon.Plus size={22}/>
+        </button>
+      )}
+
+      {/* Mobil alt navigasyon */}
+      <BottomNav
+        tab={tab}
+        onNavigate={navigate}
+        onScan={() => { setEditingId(null); setModalInitialData(null); setIsAddModalOpen(true); }}
+        onShowFamily={() => setShowFamilyModal(true)}
+        onShowSettings={() => setShowSettingsModal(true)}
+        familyBadge={pendingInviteCount}
+      />
 
       {/* Modals */}
       <AddMedicineModal
