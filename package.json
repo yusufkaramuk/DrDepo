@@ -11,8 +11,10 @@
     "migrate:firebase": "node migrate_db.cjs",
     "migrate:firebase:dry": "node migrate_db.cjs --dry-run",
     "verify:migration": "node scripts/verify-migration.cjs",
+    "test": "npm run test:unit",
+    "test:unit": "vitest run tests/unit tests/barcodeParser.test.js",
     "test:rules": "firebase emulators:exec --only firestore --config firebase.json \"vitest run tests/firestore.rules.test.js\"",
-    "test:security": "npm audit --audit-level=moderate && npm run test:rules && npm run build"
+    "test:security": "npm audit --audit-level=moderate && npm run test:unit && npm run test:rules && npm run build"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
