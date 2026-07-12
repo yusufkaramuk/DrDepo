@@ -846,9 +846,14 @@ function App() {
     } else {
       const granted = await NotificationService.requestPermission();
       if (granted) {
-        await NotificationService.subscribe(user.uid);
-        setNotifPermission('granted');
-        showToast('success', 'Bildirimler açıldı — SKT yaklaşınca uyarılacaksınız');
+        const result = await NotificationService.subscribe(user.uid);
+        if (result?.error) {
+          setNotifPermission('default');
+          showToast('error', 'Bildirim aboneliği oluşturulamadı, lütfen tekrar deneyin');
+        } else {
+          setNotifPermission('granted');
+          showToast('success', 'Bildirimler açıldı — SKT yaklaşınca uyarılacaksınız');
+        }
       } else {
         setNotifPermission('denied');
         showToast('error', 'Bildirim izni reddedildi');
