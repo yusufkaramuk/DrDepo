@@ -52,6 +52,14 @@ Modern, güvenli ve kullanıcı dostu bir web uygulaması. Evinizdeki ilaçları
 - Web Push (VAPID) ile tarayıcı bildirimi desteği
 - GitHub Actions ile zamanlanmış günlük kontrol
 
+### İlaç Kullanım Hatırlatıcısı ve Kutu Bitiş Uyarısı
+- Opt-in hatırlatıcı: saatler, günler, doz, erteleme, sessiz saatler
+- Uygulama açıkken tam ekran alarm (Aldım / Ertele / Atla), kapalıyken Web Push (15 dk kontrol, tam saat garantisi yok)
+- Kalan miktara göre tahmini kutu bitişi ve "bitmeden N gün önce" uyarısı
+- Bildirim gizlilik modu: varsayılan olarak ilaç adı bildirimde görünmez
+- Uygulama içi bildirim merkezi (30 gün / 100 kayıt saklama)
+- Ayrıntılar: [docs/REMINDERS.md](docs/REMINDERS.md)
+
 ### Salt Okunur Paylaşım Linki
 - Seçili bir ilacı şifre gerektirmeden paylaşın
 - 7 günlük geçerlilik süresi olan benzersiz token

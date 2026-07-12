@@ -31,6 +31,11 @@ export function PrivacyPolicy() {
         uçtan uca şifrelenerek saklanmaktadır. Şifreleme anahtarları yalnızca sizin cihazınızda bulunur;
         sunucularımız şifreli verilere erişemez. Paylaşım linkleri de aynı şekilde şifrelenir ve anahtar
         yalnızca URL içinde taşınır.</p>
+        <p>İlaç hatırlatıcılarında bildirimler varsayılan olarak ilaç adı içermez ("Gizli" mod).
+        "İsimli bildirim" seçeneğini açarsanız, yalnızca sizin yazdığınız kısa etiket (örn. "Tansiyon ilacı")
+        bildirimlerin gönderilebilmesi için <strong>şifrelenmeden</strong> saklanır ve telefon kilit ekranında
+        görünebilir; bu tercihi dilediğiniz an kapatabilirsiniz. Şifreli ilaç adınız hiçbir zaman bildirimlerde
+        kullanılmaz.</p>
       </Section>
 
       <Section title="5. Üçüncü Taraf Hizmetler">
