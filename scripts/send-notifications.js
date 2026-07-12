@@ -14,8 +14,11 @@
 
 import webpush from 'web-push';
 import { getFirestoreToken, withRetry } from './lib/firestore-auth.js';
-import { listAll, getField, docId, deleteDoc } from './lib/firestore-values.js';
-import { buildNotificationPayload } from './lib/sanitize.js';
+import {
+  listAll, getField, decodeFields, docId, deleteDoc, createDocIfAbsent, setDoc,
+} from './lib/firestore-values.js';
+import { buildNotificationPayload, sanitizeNotificationText } from './lib/sanitize.js';
+import { estimateRunoutDate } from '../src/utils/reminderMath.js';
 
 const {
   VAPID_PUBLIC_KEY,
@@ -109,52 +112,144 @@ async function main() {
   const users = await listAll(token, FIREBASE_PROJECT_ID, 'users');
   console.log(`[Bildirim] ${users.length} kullanıcı bulundu${DRY_RUN ? ' (DRY RUN)' : ''}`);
 
-  const counters = { usersNotified: 0, sent: 0, stale: 0, failed: 0, dry: 0 };
+  const counters = {
+    usersNotified: 0, sent: 0, stale: 0, failed: 0, dry: 0,
+    refillDue: 0, refillSent: 0, deliveriesCleaned: 0,
+  };
+  const todayKey = new Date().toISOString().slice(0, 10); // refill idempotency (günlük)
+  const cleanupCutoff = new Date(Date.now() - 7 * 86400000).toISOString();
 
   for (const userDoc of users) {
     const userId = docId(userDoc);
     if (!userId) continue;
 
+    let subs = null;
+    const getSubs = async () => {
+      if (subs === null) {
+        const subDocs = await listAll(token, FIREBASE_PROJECT_ID, `users/${userId}/pushSubscriptions`);
+        subs = dedupeSubscriptions(subDocs);
+      }
+      return subs;
+    };
+
+    // ── 1) SKT (son kullanma tarihi) uyarısı ─────────────────────────────────
     try {
       const medicines = await listAll(token, FIREBASE_PROJECT_ID, `users/${userId}/medicines`);
       const expiring = medicines.filter(m => {
         const d = daysUntilExpiry(getField(m, 'expiryDate'));
         return d !== null && d >= 0 && d <= 30;
       });
-      if (expiring.length === 0) continue;
 
-      const subDocs = await listAll(token, FIREBASE_PROJECT_ID, `users/${userId}/pushSubscriptions`);
-      const subs = dedupeSubscriptions(subDocs);
-      if (subs.length === 0) continue;
+      if (expiring.length > 0 && (await getSubs()).length > 0) {
+        // İlaç adları şifreli olduğundan bildirimde YALNIZCA sayı kullanılır.
+        const payload = buildNotificationPayload({
+          title: 'Son kullanma tarihi uyarısı',
+          body: expiring.length === 1
+            ? '1 ilacınızın son kullanma tarihi yaklaşıyor. Detay için uygulamayı açın.'
+            : `${expiring.length} ilacınızın son kullanma tarihi yaklaşıyor. Detay için uygulamayı açın.`,
+          tag: 'skt-uyari',
+          url: '/#/ilaclar?filtre=yaklasan',
+          type: 'expiry',
+        });
+        const payloadJson = JSON.stringify(payload);
 
-      // İlaç adları şifreli olduğundan bildirimde YALNIZCA sayı kullanılır.
-      const payload = buildNotificationPayload({
-        title: 'Son kullanma tarihi uyarısı',
-        body: expiring.length === 1
-          ? '1 ilacınızın son kullanma tarihi yaklaşıyor. Detay için uygulamayı açın.'
-          : `${expiring.length} ilacınızın son kullanma tarihi yaklaşıyor. Detay için uygulamayı açın.`,
-        tag: 'skt-uyari',
-        url: '/#/ilaclar?filtre=yaklasan',
-        type: 'expiry',
-      });
-      const payloadJson = JSON.stringify(payload);
-
-      let notified = false;
-      for (const sub of subs) {
-        const result = await sendToSubscription(token, userId, sub, payloadJson);
-        counters[result]++;
-        if (result === 'sent' || result === 'dry') notified = true;
+        let notified = false;
+        for (const sub of await getSubs()) {
+          const result = await sendToSubscription(token, userId, sub, payloadJson);
+          counters[result]++;
+          if (result === 'sent' || result === 'dry') notified = true;
+        }
+        if (notified) counters.usersNotified++;
       }
-      if (notified) counters.usersNotified++;
     } catch (err) {
       // Tek kullanıcı hatası tüm işi durdurmaz
       console.warn(`[Bildirim] Kullanıcı işlenemedi (HTTP ${err.status ?? err.statusCode ?? '?'})`);
     }
+
+    // ── 2) Kutu bitiş (refill) uyarısı — yalnızca yeterli veri varsa ─────────
+    try {
+      const schedDocs = await listAll(token, FIREBASE_PROJECT_ID, `users/${userId}/medicationSchedules`);
+      for (const schedDoc of schedDocs) {
+        const schedule = { id: docId(schedDoc), ...decodeFields(schedDoc) };
+        if (schedule.enabled !== true || schedule.refillReminderEnabled !== true) continue;
+
+        const runout = estimateRunoutDate(schedule.remainingUnits, schedule);
+        if (!runout) continue; // eksik/geçersiz veri → hesaplama yapılmaz
+        const lead = Number.isFinite(Number(schedule.refillLeadDays)) ? Number(schedule.refillLeadDays) : 7;
+        if (runout.daysLeft > lead) continue;
+        counters.refillDue++;
+        if (DRY_RUN) continue;
+
+        // Günlük idempotency anahtarı: refill_{scheduleId}_{YYYY-MM-DD}
+        const refillKey = `refill_${schedule.id}_${todayKey}`;
+        const created = await createDocIfAbsent(
+          token, FIREBASE_PROJECT_ID,
+          `users/${userId}/reminderDeliveries/${refillKey}`,
+          {
+            scheduleId: schedule.id,
+            slot: refillKey,
+            status: 'pending',
+            createdAt: new Date().toISOString(),
+            expireAt: new Date(Date.now() + 7 * 86400000),
+          },
+        );
+        if (!created) continue;
+
+        const label = schedule.notificationPrivacyMode === 'named'
+          ? sanitizeNotificationText(schedule.displayLabel, 40)
+          : null;
+        const payload = buildNotificationPayload({
+          title: 'İlaç stoğu azalıyor',
+          body: label
+            ? `${label} bitmek üzere, yenisini temin etmeyi unutmayın.`
+            : 'İlacınız bitmek üzere, yenisini temin etmeyi unutmayın.',
+          tag: refillKey,
+          url: '/#/bildirimler',
+          type: 'refill',
+          scheduleId: schedule.id,
+        });
+        const payloadJson = JSON.stringify(payload);
+
+        for (const sub of await getSubs()) {
+          const result = await sendToSubscription(token, userId, sub, payloadJson);
+          counters[result]++;
+        }
+        counters.refillSent++;
+
+        try {
+          await setDoc(token, FIREBASE_PROJECT_ID, `users/${userId}/notifications/${refillKey}`, {
+            type: 'refill',
+            title: payload.title,
+            body: payload.body,
+            scheduleId: schedule.id,
+            read: false,
+            createdAt: new Date().toISOString(),
+          });
+        } catch { /* inbox kaydı kritik değil */ }
+      }
+    } catch (err) {
+      console.warn(`[Bildirim] Refill kontrolü yapılamadı (HTTP ${err.status ?? err.statusCode ?? '?'})`);
+    }
+
+    // ── 3) Eski teslimat kayıtlarını temizle (TTL politikası yoksa fallback) ─
+    try {
+      if (DRY_RUN) continue;
+      const deliveries = await listAll(token, FIREBASE_PROJECT_ID, `users/${userId}/reminderDeliveries`);
+      for (const d of deliveries) {
+        const createdAt = getField(d, 'createdAt');
+        if (typeof createdAt === 'string' && createdAt < cleanupCutoff) {
+          await deleteDoc(token, FIREBASE_PROJECT_ID, `users/${userId}/reminderDeliveries/${docId(d)}`);
+          counters.deliveriesCleaned++;
+        }
+      }
+    } catch { /* temizlik bir sonraki koşuda tekrar denenir */ }
   }
 
   console.log(
     `[Bildirim] Tamamlandı — kullanıcı: ${counters.usersNotified}, gönderilen: ${counters.sent}, ` +
-    `temizlenen eski abonelik: ${counters.stale}, hata: ${counters.failed}` +
+    `refill vadesi: ${counters.refillDue}, refill gönderilen: ${counters.refillSent}, ` +
+    `temizlenen eski abonelik: ${counters.stale}, temizlenen teslimat kaydı: ${counters.deliveriesCleaned}, ` +
+    `hata: ${counters.failed}` +
     (DRY_RUN ? `, dry-run atlanan: ${counters.dry}` : ''),
   );
 }
