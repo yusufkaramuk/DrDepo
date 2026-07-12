@@ -259,3 +259,188 @@ describe('Firestore account deletion job rules', () => {
         await assertFails(getDoc(jobRef));
     });
 });
+
+// ── Hatırlatıcı (medicationSchedules) kuralları ──────────────────────────────
+
+const validSchedule = (overrides = {}) => ({
+    medicineId: 'medicine-a',
+    enabled: true,
+    timezone: 'Europe/Istanbul',
+    scheduleTimes: ['08:00', '20:00'],
+    daysOfWeek: [1, 2, 3, 4, 5],
+    dosePerIntake: 1,
+    unitLabel: 'tablet',
+    unitsPerPackage: 20,
+    remainingUnits: 15,
+    refillLeadDays: 7,
+    refillReminderEnabled: true,
+    medicationReminderEnabled: true,
+    snoozeMinutes: 10,
+    quietHours: { start: '22:00', end: '07:00' },
+    notificationPrivacyMode: 'generic',
+    displayLabel: '',
+    caregiverEscalationEnabled: false,
+    createdAt: '2026-07-12T10:00:00.000Z',
+    updatedAt: '2026-07-12T10:00:00.000Z',
+    ...overrides
+});
+
+const scheduleRef = (db, userId = 'user-a', id = 'medicine-a') => (
+    doc(db, `users/${userId}/medicationSchedules/${id}`)
+);
+
+describe('Firestore medication schedule rules', () => {
+    it('allows the owner to create, read, update and delete their schedule', async () => {
+        const db = testEnv.authenticatedContext('user-a').firestore();
+        const ref = scheduleRef(db);
+
+        await assertSucceeds(setDoc(ref, validSchedule()));
+        await assertSucceeds(getDoc(ref));
+        await assertSucceeds(setDoc(ref, validSchedule({ remainingUnits: 14, enabled: false })));
+        await assertSucceeds(deleteDoc(ref));
+    });
+
+    it('blocks another user (even a family member) from reading schedules', async () => {
+        await testEnv.withSecurityRulesDisabled(async (context) => {
+            const admin = context.firestore();
+            await setDoc(scheduleRef(admin), validSchedule());
+            await setDoc(doc(admin, 'users/user-a'), { familyId: 'fam-1' });
+            await setDoc(doc(admin, 'users/user-b'), { familyId: 'fam-1' });
+            await setDoc(doc(admin, 'families/fam-1'), {
+                name: 'Aile', createdBy: 'user-a',
+                members: {
+                    'user-a': { role: 'admin' },
+                    'user-b': { role: 'member' }
+                }
+            });
+        });
+
+        const otherDb = testEnv.authenticatedContext('user-b').firestore();
+        await assertFails(getDoc(scheduleRef(otherDb, 'user-a')));
+        await assertFails(getDocs(collection(otherDb, 'users/user-a/medicationSchedules')));
+        await assertFails(setDoc(scheduleRef(otherDb, 'user-a'), validSchedule()));
+    });
+
+    it('rejects unexpected fields', async () => {
+        const db = testEnv.authenticatedContext('user-a').firestore();
+        await assertFails(setDoc(scheduleRef(db), validSchedule({ hacked: true })));
+    });
+
+    it('rejects wrong types and out-of-bounds numbers', async () => {
+        const db = testEnv.authenticatedContext('user-a').firestore();
+        await assertFails(setDoc(scheduleRef(db), validSchedule({ enabled: 'yes' })));
+        await assertFails(setDoc(scheduleRef(db), validSchedule({ dosePerIntake: 100 })));
+        await assertFails(setDoc(scheduleRef(db), validSchedule({ dosePerIntake: 0 })));
+        await assertFails(setDoc(scheduleRef(db), validSchedule({ remainingUnits: -1 })));
+        await assertFails(setDoc(scheduleRef(db), validSchedule({ remainingUnits: 999999 })));
+        await assertFails(setDoc(scheduleRef(db), validSchedule({ refillLeadDays: 90 })));
+        await assertFails(setDoc(scheduleRef(db), validSchedule({ snoozeMinutes: 1 })));
+        await assertFails(setDoc(scheduleRef(db), validSchedule({ notificationPrivacyMode: 'loud' })));
+    });
+
+    it('rejects oversized lists and strings', async () => {
+        const db = testEnv.authenticatedContext('user-a').firestore();
+        const manyTimes = Array.from({ length: 13 }, (_, i) => `0${i % 10}:00`);
+        await assertFails(setDoc(scheduleRef(db), validSchedule({ scheduleTimes: manyTimes })));
+        await assertFails(setDoc(scheduleRef(db), validSchedule({ daysOfWeek: [0, 1, 2, 3, 4, 5, 6, 0] })));
+        await assertFails(setDoc(scheduleRef(db), validSchedule({ timezone: 'x'.repeat(80) })));
+        await assertFails(setDoc(scheduleRef(db), validSchedule({ displayLabel: 'x'.repeat(50) })));
+    });
+
+    it('rejects malformed quietHours', async () => {
+        const db = testEnv.authenticatedContext('user-a').firestore();
+        await assertFails(setDoc(scheduleRef(db), validSchedule({ quietHours: { start: '25:99', end: '07:00' } })));
+        await assertFails(setDoc(scheduleRef(db), validSchedule({ quietHours: { start: '22:00' } })));
+        await assertFails(setDoc(scheduleRef(db), validSchedule({ quietHours: 'gece' })));
+        await assertSucceeds(setDoc(scheduleRef(db), validSchedule({ quietHours: null })));
+    });
+});
+
+describe('Firestore reminder delivery rules', () => {
+    it('lets the owner read but never write delivery records', async () => {
+        await testEnv.withSecurityRulesDisabled(async (context) => {
+            await setDoc(doc(context.firestore(), 'users/user-a/reminderDeliveries/slot-1'), {
+                scheduleId: 'medicine-a', status: 'sent', sentAt: '2026-07-12T08:00:00.000Z'
+            });
+        });
+
+        const db = testEnv.authenticatedContext('user-a').firestore();
+        await assertSucceeds(getDoc(doc(db, 'users/user-a/reminderDeliveries/slot-1')));
+        await assertFails(setDoc(doc(db, 'users/user-a/reminderDeliveries/slot-2'), { status: 'sent' }));
+        await assertFails(updateDoc(doc(db, 'users/user-a/reminderDeliveries/slot-1'), { status: 'failed' }));
+        await assertFails(deleteDoc(doc(db, 'users/user-a/reminderDeliveries/slot-1')));
+    });
+
+    it('blocks other users from reading delivery records', async () => {
+        await testEnv.withSecurityRulesDisabled(async (context) => {
+            await setDoc(doc(context.firestore(), 'users/user-a/reminderDeliveries/slot-1'), { status: 'sent' });
+        });
+        const otherDb = testEnv.authenticatedContext('user-b').firestore();
+        await assertFails(getDoc(doc(otherDb, 'users/user-a/reminderDeliveries/slot-1')));
+    });
+});
+
+describe('Firestore in-app notification rules', () => {
+    const validNotif = (overrides = {}) => ({
+        type: 'intake',
+        title: 'İlaç zamanınız geldi',
+        body: 'Planlanan ilacınızı almayı unutmayın.',
+        read: false,
+        createdAt: '2026-07-12T08:00:00.000Z',
+        ...overrides
+    });
+
+    it('owner can create valid notifications and mark them read', async () => {
+        const db = testEnv.authenticatedContext('user-a').firestore();
+        const ref = doc(db, 'users/user-a/notifications/n1');
+
+        await assertSucceeds(setDoc(ref, validNotif()));
+        await assertSucceeds(updateDoc(ref, { read: true }));
+        await assertSucceeds(deleteDoc(ref));
+    });
+
+    it('update may only touch the read field', async () => {
+        const db = testEnv.authenticatedContext('user-a').firestore();
+        const ref = doc(db, 'users/user-a/notifications/n1');
+        await assertSucceeds(setDoc(ref, validNotif()));
+        await assertFails(updateDoc(ref, { title: 'Değişti' }));
+        await assertFails(updateDoc(ref, { read: true, body: 'Değişti' }));
+        await assertFails(updateDoc(ref, { read: 'evet' }));
+    });
+
+    it('rejects invalid type, oversized text and foreign users', async () => {
+        const db = testEnv.authenticatedContext('user-a').firestore();
+        await assertFails(setDoc(doc(db, 'users/user-a/notifications/n2'), validNotif({ type: 'spam' })));
+        await assertFails(setDoc(doc(db, 'users/user-a/notifications/n3'), validNotif({ title: 'x'.repeat(120) })));
+        await assertFails(setDoc(doc(db, 'users/user-a/notifications/n4'), validNotif({ extra: 1 })));
+
+        const otherDb = testEnv.authenticatedContext('user-b').firestore();
+        await assertFails(getDoc(doc(otherDb, 'users/user-a/notifications/n1')));
+        await assertFails(setDoc(doc(otherDb, 'users/user-a/notifications/nx'), validNotif()));
+    });
+});
+
+describe('Firestore push subscription rules (tightened)', () => {
+    const validSub = (overrides = {}) => ({
+        endpoint: 'https://fcm.googleapis.com/fcm/send/abc123',
+        keys: { p256dh: 'pk', auth: 'ak' },
+        createdAt: '2026-07-12T08:00:00.000Z',
+        userAgent: 'TestUA',
+        ...overrides
+    });
+
+    it('accepts the existing client subscribe payload', async () => {
+        const db = testEnv.authenticatedContext('user-a').firestore();
+        await assertSucceeds(setDoc(doc(db, 'users/user-a/pushSubscriptions/sub1'), validSub()));
+    });
+
+    it('rejects non-https endpoints, extra fields and foreign writes', async () => {
+        const db = testEnv.authenticatedContext('user-a').firestore();
+        await assertFails(setDoc(doc(db, 'users/user-a/pushSubscriptions/s2'), validSub({ endpoint: 'http://insecure.example' })));
+        await assertFails(setDoc(doc(db, 'users/user-a/pushSubscriptions/s3'), validSub({ evil: true })));
+        await assertFails(setDoc(doc(db, 'users/user-a/pushSubscriptions/s4'), validSub({ endpoint: 'https://' + 'x'.repeat(600) })));
+
+        const otherDb = testEnv.authenticatedContext('user-b').firestore();
+        await assertFails(setDoc(doc(otherDb, 'users/user-a/pushSubscriptions/s5'), validSub()));
+    });
+});
