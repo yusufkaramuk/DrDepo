@@ -261,7 +261,7 @@ export const AddMedicineModal = ({ isOpen, onClose, onSave, initialData, isEdit,
               <span className="text-[12px] font-medium text-slate-700">Miktar / Form</span>
               <span className="text-[11px] text-slate-400 ml-2">· Örn: 20 tablet, 100 ml şurup</span>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               <input
                 value={data.quantity}
                 onChange={e => set('quantity', e.target.value)}
@@ -269,6 +269,7 @@ export const AddMedicineModal = ({ isOpen, onClose, onSave, initialData, isEdit,
                 className={`${FIELD_INPUT} flex-1`}
               />
               <StockCounter value={data.stockCount ?? 1} onChange={v => set('stockCount', v)}/>
+              <span className="text-[12px] text-slate-500 dark:text-slate-400 shrink-0">kutu</span>
             </div>
           </div>
 

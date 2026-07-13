@@ -72,3 +72,9 @@ public/medicines.json
 
 # Orphaned Cloud Functions draft (requires Blaze; not wired into firebase.json)
 functions/
+
+# Yerel veri yedekleri ve operasyonel teşhis scriptleri (commit edilmez)
+backup-*.json
+scripts/diagnose-data.cjs
+scripts/backup-stray-account.cjs
+scripts/fix-google-link.cjs

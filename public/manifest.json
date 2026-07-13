@@ -37,13 +37,6 @@
     ],
     "screenshots": [
         {
-            "src": "/screenshot-desktop-crop.png",
-            "sizes": "1280x800",
-            "type": "image/png",
-            "form_factor": "wide",
-            "label": "DrDepo - Masaüstü"
-        },
-        {
             "src": "/screenshot-mobile.png",
             "sizes": "1024x1536",
             "type": "image/png",

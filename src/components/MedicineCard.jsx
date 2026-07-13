@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pencil, Trash2, Calendar, Clock, Droplets, Share2, Bell, BellRing } from 'lucide-react';
+import { formatBoxes } from '../utils/quantity';
 
 const TR_MONTHS = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
 
@@ -46,8 +47,7 @@ export const MedicineCard = ({ medicine, onEdit, onDelete, onShare, onReminder, 
   const st = calcStatus(medicine.expiryDate);
   const s = STATUS[st.key] || STATUS.unknown;
   const ingredients = [medicine.activeIngredient1, medicine.activeIngredient2, medicine.activeIngredient3].filter(Boolean);
-  const count = medicine.count || 1;
-  const stockCount = medicine.stockCount || 1;
+  const totalBoxCount = medicine.totalBoxCount ?? 1;
   const allIds = medicine.allIds || [medicine.id];
 
   const handleDelete = () => onDelete && onDelete({ ...medicine, allIds });
@@ -61,16 +61,9 @@ export const MedicineCard = ({ medicine, onEdit, onDelete, onShare, onReminder, 
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2 flex-wrap">
           <StatusPill status={st.key} daysLeft={st.daysLeft} />
-          {count > 1 && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold rounded-full bg-[var(--brand-50)] text-[var(--brand-700)] ring-1 ring-[var(--brand-100)] tabular-nums">
-              ×{count} adet
-            </span>
-          )}
-          {stockCount > 1 && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold rounded-full bg-slate-100 text-slate-600 ring-1 ring-slate-200 tabular-nums dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700">
-              {stockCount} kutu
-            </span>
-          )}
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold rounded-full bg-[var(--brand-50)] text-[var(--brand-700)] ring-1 ring-[var(--brand-100)] tabular-nums">
+            {formatBoxes(totalBoxCount)}
+          </span>
         </div>
         <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
           {medicine.canEdit !== false ? (

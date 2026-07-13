@@ -35,6 +35,7 @@ import { AlarmOverlay } from './components/AlarmOverlay';
 import { NotificationCenterView } from './views/NotificationCenterView';
 import { useInAppReminders } from './hooks/useInAppReminders';
 import { decrementRemaining } from './utils/reminderMath';
+import { calculateTotalBoxes, formatBoxes } from './utils/quantity';
 import appLogo from './assets/drdepo-logo.svg';
 
 const BarcodeScanner = lazy(() => import('./components/BarcodeScanner').then(m => ({ default: m.BarcodeScanner })));
@@ -96,6 +97,18 @@ function statusOf(med) {
   if (d <= 30)  return { key: 'warning', daysLeft: d };
   if (d <= 90)  return { key: 'soon',    daysLeft: d };
   return { key: 'good', daysLeft: d };
+}
+
+// Tek durum sınıflandırması (single source of truth): sayaç, filtre ve chip'ler
+// bunu kullanır → tile = chip = liste. 'soon' güvenli sayıldığından 'good'a
+// katlanır; 'unknown' (SKT girilmemiş) güvenli SAYILMAZ, ayrı kalır ve yalnız
+// "Tümü" listesinde görünür.
+function statusBucket(med) {
+  const k = statusOf(med).key;
+  if (k === 'expired') return 'expired';
+  if (k === 'warning') return 'warning';
+  if (k === 'good' || k === 'soon') return 'good';
+  return 'unknown';
 }
 
 // ── Turkish date label ────────────────────────────────────────────────────────
@@ -160,9 +173,7 @@ const MedicineRow = ({ medicine, onEdit, onDelete, onReminder, hasReminder = fal
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <h4 className="text-[14.5px] font-semibold text-slate-900 dark:text-slate-100 truncate">{medicine.name}</h4>
-          {(medicine.count || 1) > 1 && (
-            <span className="text-[11px] font-semibold text-[var(--brand-700)] bg-[var(--brand-50)] ring-1 ring-[var(--brand-100)] px-1.5 py-0.5 rounded-md tabular-nums">×{medicine.count}</span>
-          )}
+          <span className="text-[11px] font-semibold text-[var(--brand-700)] bg-[var(--brand-50)] ring-1 ring-[var(--brand-100)] px-1.5 py-0.5 rounded-md tabular-nums">{formatBoxes(medicine.totalBoxCount ?? 1)}</span>
         </div>
         <div className="flex items-center gap-2 text-[12px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
           {medicine.quantity && <span>{medicine.quantity}</span>}
@@ -600,13 +611,17 @@ function App() {
     return () => clearTimeout(t);
   }, [searchTerm]);
 
-  // Bildirimden/ana sayfadan gelen derin bağlantı: #/ilaclar?filtre=yaklasan
-  // Not: filtre parametresi yoksa "Tümü"ye döner — aksi hâlde bir kez
-  // uygulanan filtre kalıcılaşıp sonraki normal İlaçlarım ziyaretlerinde
-  // ilgisiz ilaçları gizler ("verilerim kayboldu" hissi verir).
+  // Derin bağlantı → filtre. Ana sayfa istatistik kutuları enum durum anahtarı
+  // gönderir (#/ilaclar?durum=expired|warning|good); bildirim/önizleme linkleri
+  // eski `filtre=yaklasan`'ı kullanır (warning). Parametre yoksa "Tümü"ye döner
+  // — aksi hâlde filtre kalıcılaşıp sonraki normal ziyaretlerde ilgisiz ilaçları
+  // gizler ("verilerim kayboldu" hissi).
   useEffect(() => {
     if (tab !== 'ilaclar') return;
-    setStatusFilter(routeParams.get('filtre') === 'yaklasan' ? 'warning' : 'all');
+    const durum = routeParams.get('durum');
+    if (['expired', 'warning', 'good'].includes(durum)) setStatusFilter(durum);
+    else if (routeParams.get('filtre') === 'yaklasan') setStatusFilter('warning');
+    else setStatusFilter('all');
   }, [tab, routeParams]);
 
   // TITCK veritabanını arka planda güncelle
@@ -1244,7 +1259,8 @@ function App() {
         );
       });
       dupes.forEach(d => seen.add(d.id));
-      grouped.push({ ...med, count: dupes.length, allIds: dupes.map(d => d.id) });
+      // dupes primary (med) dahil grubun tüm kayıtlarını içerir → toplam kutu doğru.
+      grouped.push({ ...med, count: dupes.length, allIds: dupes.map(d => d.id), totalBoxCount: calculateTotalBoxes(dupes) });
     });
     return grouped;
   }
@@ -1271,11 +1287,7 @@ function App() {
   const filteredMedicines = useMemo(() => {
     const q = debouncedSearch;
     const filtered = activeGrouped.filter(m => {
-      if (statusFilter !== 'all') {
-        const k = statusOf(m).key;
-        if (statusFilter === 'good' && k !== 'good' && k !== 'soon') return false;
-        if (statusFilter !== 'good' && k !== statusFilter) return false;
-      }
+      if (statusFilter !== 'all' && statusBucket(m) !== statusFilter) return false;
       if (tagFilter && !(m.tags || []).includes(tagFilter)) return false;
       if (!q) return true;
       if (m.barcode && String(m.barcode).toLowerCase().includes(q)) return true;
@@ -1312,10 +1324,11 @@ function App() {
     let total = 0, expired = 0, warning = 0, good = 0;
     allMedicines.forEach(m => {
       total += 1;
-      const k = statusOf(m).key;
-      if (k === 'expired') expired += 1;
-      else if (k === 'warning') warning += 1;
-      else good += 1;
+      const b = statusBucket(m);
+      if (b === 'expired') expired += 1;
+      else if (b === 'warning') warning += 1;
+      else if (b === 'good') good += 1;
+      // 'unknown' yalnız total'a girer; kategori sayaçlarına değil.
     });
     return { total, expired, warning, good };
   }, [allMedicines]);
@@ -1347,7 +1360,7 @@ function App() {
   const firstName = (user.displayName || user.email || 'Kullanıcı').split(' ')[0];
 
   return (
-    <div className="min-h-screen bg-slate-50/60 dark:bg-slate-950 pb-32 md:pb-24" style={{
+    <div className="min-h-screen bg-slate-50/60 dark:bg-slate-950 pb-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom))] md:pb-0" style={{
       backgroundImage: 'radial-gradient(1200px 600px at 80% -10%, color-mix(in srgb, var(--brand-500) 8%, transparent), transparent), radial-gradient(800px 400px at -10% 0%, rgba(20,184,166,0.06), transparent)',
     }}>
       <Header
@@ -1398,7 +1411,7 @@ function App() {
                 onClick={() => setStockMode('family')}
                 className={`flex-1 flex items-center justify-center gap-2.5 py-3 px-3 rounded-xl text-[14px] sm:text-[15px] font-semibold transition-all duration-300 ease-out ${
                   stockMode === 'family'
-                    ? 'bg-white dark:bg-slate-700 text-[var(--brand-700)] dark:text-[var(--brand-300)] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.12)]'
+                    ? 'bg-white dark:bg-slate-700 text-[var(--brand-700)] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.12)]'
                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-700/60'
                 }`}
               >
@@ -1410,7 +1423,7 @@ function App() {
                 onClick={() => setStockMode('personal')}
                 className={`flex-1 flex items-center justify-center gap-2.5 py-3 px-3 rounded-xl text-[14px] sm:text-[15px] font-semibold transition-all duration-300 ease-out ${
                   stockMode === 'personal'
-                    ? 'bg-white dark:bg-slate-700 text-[var(--brand-700)] dark:text-[var(--brand-300)] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.12)]'
+                    ? 'bg-white dark:bg-slate-700 text-[var(--brand-700)] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.12)]'
                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-700/60'
                 }`}
               >
@@ -1433,9 +1446,9 @@ function App() {
         {/* Kompakt istatistik pill'leri (tek sıra) */}
         <div className="grid grid-cols-4 gap-2 sm:gap-3 mb-6">
           <StatTile tone="total"   label="Toplam"        value={stats.total}   onClick={() => navigate('ilaclar')}/>
-          <StatTile tone="expired" label="Süresi Geçmiş"  value={stats.expired} onClick={() => navigate('ilaclar', { filtre: 'yaklasan' })}/>
-          <StatTile tone="warning" label="Yakında Bitecek" value={stats.warning} onClick={() => navigate('ilaclar', { filtre: 'yaklasan' })}/>
-          <StatTile tone="good"    label="Güvenli"        value={stats.good}    onClick={() => navigate('ilaclar')}/>
+          <StatTile tone="expired" label="Süresi Geçmiş"  value={stats.expired} onClick={() => navigate('ilaclar', { durum: 'expired' })}/>
+          <StatTile tone="warning" label="Yakında Bitecek" value={stats.warning} onClick={() => navigate('ilaclar', { durum: 'warning' })}/>
+          <StatTile tone="good"    label="Güvenli"        value={stats.good}    onClick={() => navigate('ilaclar', { durum: 'good' })}/>
         </div>
 
         {/* Yakında bitecekler önizlemesi */}
@@ -1578,10 +1591,10 @@ function App() {
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
             {[
-              { k: 'all',     l: 'Tümü',          c: allMedicines.length,                                                          color: null },
-              { k: 'expired', l: 'Süresi geçmiş', c: allMedicines.filter(m => statusOf(m).key === 'expired').length,               color: 'rose' },
-              { k: 'warning', l: 'Yakında biter',  c: allMedicines.filter(m => statusOf(m).key === 'warning').length,               color: 'amber' },
-              { k: 'good',    l: 'Güvenli',        c: allMedicines.filter(m => ['good','soon'].includes(statusOf(m).key)).length,   color: 'emerald' },
+              { k: 'all',     l: 'Tümü',          c: allMedicines.length,                                            color: null },
+              { k: 'expired', l: 'Süresi geçmiş', c: allMedicines.filter(m => statusBucket(m) === 'expired').length, color: 'rose' },
+              { k: 'warning', l: 'Yakında biter',  c: allMedicines.filter(m => statusBucket(m) === 'warning').length, color: 'amber' },
+              { k: 'good',    l: 'Güvenli',        c: allMedicines.filter(m => statusBucket(m) === 'good').length,    color: 'emerald' },
             ].map(chip => {
               const active = statusFilter === chip.k;
               const dotCls = chip.color === 'rose' ? 'bg-rose-500' : chip.color === 'amber' ? 'bg-amber-500' : chip.color === 'emerald' ? 'bg-emerald-500' : 'bg-slate-400';

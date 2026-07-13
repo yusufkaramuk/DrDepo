@@ -27,7 +27,7 @@ const NavButton = ({ label, icon, active, onClick, badge = 0 }) => (
       )}
     </span>
     <span className={`text-[10.5px] ${active ? 'font-semibold' : 'font-medium'}`}>{label}</span>
-    {active && <span aria-hidden="true" className="absolute top-1 w-1 h-1 rounded-full bg-[var(--brand-600)]"></span>}
+    {active && <span aria-hidden="true" className="absolute top-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[var(--brand-600)]"></span>}
   </button>
 );
 

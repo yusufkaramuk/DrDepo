@@ -39,6 +39,10 @@
     --blur-backdrop: 8px;
     --duration-fast: 0.18s;
     --duration-normal: 0.25s;
+
+    /* Mobil alt navigasyon içerik yüksekliği (py-1 8px + min-h-56px).
+       Sayfa kökü, sabit nav'ı temizlemek için bunu + safe-area kullanır. */
+    --bottom-nav-height: 64px;
   }
 
   /* Koyu tema: skala ters-eşlenir; brand-50/100 çip zeminleri koyu teal

@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatBoxes, normalizeStockCount } from '../utils/quantity';
 
 const Ic = ({ d, size = 18, stroke = 2, className = '', extra = null }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24"
@@ -80,7 +81,7 @@ export function AddedMedicineSuccessModal({ medicineData, onConfirm, onCancel })
               <div className="flex items-center gap-3 text-sm">
                 <Icon.Box size={16} className="text-slate-400 dark:text-slate-500" />
                 <span className="text-slate-600 dark:text-slate-400 dark:text-slate-500 w-24">Stok / Miktar:</span>
-                <span className="font-semibold text-slate-900 dark:text-slate-100">{medicineData.stockCount || 1} Adet {medicineData.quantity ? `(${medicineData.quantity})` : ''}</span>
+                <span className="font-semibold text-slate-900 dark:text-slate-100">{formatBoxes(normalizeStockCount(medicineData.stockCount))} {medicineData.quantity ? `(${medicineData.quantity})` : ''}</span>
               </div>
               
               <div className="flex items-center gap-3 text-sm">
