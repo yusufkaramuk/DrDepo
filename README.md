@@ -19,7 +19,7 @@ Modern, güvenli ve kullanıcı dostu bir web uygulaması. Evinizdeki ilaçları
 ### İlaç Yönetimi
 - İlaç ekleme, düzenleme, silme ve listeleme (CRUD)
 - Her ilaç için 3 farklı etken madde kaydı
-- Akıllı gruplama: aynı bilgilere sahip ilaçlar otomatik gruplanır (×2, ×3 gösterimi)
+- Akıllı gruplama: aynı bilgilere sahip ilaçlar otomatik gruplanır ve toplam kutu sayısı tek biçimde gösterilir ("2 kutu", "3 kutu")
 - Toplu ekleme: birden fazla ilacı tek seferde JSON ile içe aktarın
 - Etiket sistemi: ilaçlara özel etiket ekleyin ve etiketle filtreleyin
 
@@ -31,10 +31,10 @@ Modern, güvenli ve kullanıcı dostu bir web uygulaması. Evinizdeki ilaçları
 - Veriler IndexedDB'de önbelleğe alınır — offline çalışır
 
 ### Aile Modu
-- E-posta ile aile üyesi daveti (7 günlük geçerlilik)
-- Aile üyeleri birbirinin ilaç stoğunu görebilir
+- E-posta veya tek kullanımlık QR ile aile üyesi daveti
+- Aile üyeleri birbirinin ilaç stoğunu görebilir (Kişisel/Aile deposu geçişi)
 - **Özel İlaç** seçeneği — işaretlenen ilaçlar aile üyelerine gizlenir
-- Admin/üye rol sistemi: sadece admin yeni üye davet edebilir
+- Admin / Editör / Üye rol sistemi: admin üye davet eder ve rolleri yönetir; admin ve editör aile adını değiştirebilir (yetki Firestore kurallarıyla zorlanır)
 
 ### Akıllı Arama ve Sıralama
 - Fuzzy Search: yanlış yazımlara toleranslı arama (Levenshtein algoritması)
@@ -51,6 +51,7 @@ Modern, güvenli ve kullanıcı dostu bir web uygulaması. Evinizdeki ilaçları
 - Son kullanma tarihi yaklaşan ilaçlar için otomatik bildirim
 - Web Push (VAPID) ile tarayıcı bildirimi desteği
 - GitHub Actions ile zamanlanmış günlük kontrol
+- Güvenli bildirim boru hattı: recursive Firestore REST değer çözümleyicisi, merkezî metin sanitizasyonu (Türkçe karakter korumalı, kontrol/zero-width temizliği), SHA-256 abonelik kimlikleri, hatalı aboneliklerin (404/410) otomatik temizliği ve Service Worker payload allowlist doğrulaması
 
 ### İlaç Kullanım Hatırlatıcısı ve Kutu Bitiş Uyarısı
 - Opt-in hatırlatıcı: saatler, günler, doz, erteleme, sessiz saatler
@@ -75,12 +76,13 @@ Modern, güvenli ve kullanıcı dostu bir web uygulaması. Evinizdeki ilaçları
 - Offline çalışma desteği (IndexedDB + Service Worker)
 - Responsive tasarım (mobil ve masaüstü)
 
-### Arayüz ve Kişiselleştirme
-- Gelişmiş Karanlık Mod (Dark Mode) / Açık Mod
-- Kullanıcı Ayarları paneli (Şifre değiştirme)
-- Dinamik Yazı Boyutu ayarı (Responsive tipografi)
-- Liste ve grid görünümü
-- Türkçe arayüz
+### Tasarım Sistemi ve Arayüz
+- Yenilenmiş, mobil öncelikli tasarım dili (teal marka paleti, Poppins tipografisi, yumuşak katman ve derinlik)
+- Merkezî design token'lar / CSS değişkenleri (renk, radius, gölge, blur, spacing, animasyon) — açık ve karanlık temaya tam uyum
+- Alt navigasyon (mobil) ve üst sekmeler (masaüstü): Ana Sayfa · İlaçlarım · Bildirimler · Aile · Ayarlar
+- Ana sayfa: kompakt durum kartları, "yakında bitecekler" önizlemesi ve hızlı ilaç ekleme
+- Erişilebilirlik: ≥44px dokunma hedefleri, klavye focus, `aria` etiketleri, `prefers-reduced-motion`, alanla ilişkili form hataları
+- Gelişmiş Karanlık Mod / Açık Mod, Dinamik Yazı Boyutu, liste ve grid görünümü, tam Türkçe arayüz
 
 ---
 
@@ -105,7 +107,8 @@ Geçerli kullanım şartları için [LICENSE.md](LICENSE.md) dosyasını inceley
 |-----------|----------|-------|
 | React | 18 | UI framework |
 | Vite | 7 | Build tool |
-| Tailwind CSS | 3 | Styling |
+| Tailwind CSS | 3 | Styling (design token'lar / CSS değişkenleri) |
+| Poppins | — | Tipografi |
 | Lucide React | latest | İkonlar |
 
 ### Backend & Veritabanı
@@ -173,6 +176,16 @@ npm run test:security  # Tam güvenlik kontrolü
 ---
 
 ## Changelog
+
+### v3.0.0 — Tasarım Yenilemesi, İlaç Hatırlatıcısı & Bildirim Altyapısı
+- **Yeni Tasarım Sistemi**: Mobil öncelikli, teal marka paletli (MediDepo) yenilenmiş arayüz; Poppins tipografisi; merkezî design token'lar (renk/radius/gölge/blur/spacing/animasyon) ve açık/karanlık tema uyumu. Alt navigasyon (mobil) + üst sekmeler (masaüstü), yenilenmiş ana sayfa (kompakt durum kartları, "yakında bitecekler" önizlemesi).
+- **İlaç Kullanım Hatırlatıcısı**: Opt-in hatırlatıcı (saatler, günler, doz, erteleme, sessiz saatler); uygulama açıkken tam ekran alarm (Aldım / Ertele / Atla), sekme arka plandayken ve uygulama kapalıyken Web Push; kalan miktara göre tahmini kutu bitişi ve refill uyarısı. Ayrı `medicationSchedules` alt koleksiyonu, migration gerektirmez.
+- **Bildirim Merkezi & Gizlilik Modu**: Uygulama içi bildirim merkezi (sınırlı saklama); bildirimlerde varsayılan olarak ilaç adı gizli, isteğe bağlı isimli mod (açık onaylı düz metin etiket).
+- **Bildirim Boru Hattı Düzeltmesi**: "Anlamsız karakter/`[object Object]`" hatasının kök nedenleri giderildi — recursive Firestore REST decoder, merkezî `sanitizeNotificationText`, şifreli alan sızıntı emniyeti, SHA-256 abonelik kimlikleri, 404/410 temizliği, retry/backoff, dry-run; Service Worker payload allowlist + same-origin yönlendirme.
+- **Aile**: Aile adı sonradan değiştirilebilir (yalnızca admin/editör; yetki Firestore kurallarıyla zorlanır).
+- **Güvenlik**: Yeni koleksiyonlar (`medicationSchedules`, `reminderDeliveries`, `notifications`) için Firestore kuralları ve `pushSubscriptions` alan doğrulaması; kapsamlı birim testleri (decoder, sanitizer, slot/DST matematiği, kutu bitiş tahmini) + rules testleri.
+- **UI/SEO Düzeltmeleri**: Ana sayfa durum kartı yönlendirmeleri tek `statusBucket` kaynağıyla tutarlı hale getirildi; alt navigasyon aktif nokta hizası; karanlık temada depo seçim butonu okunurluğu; mobil footer boşluğu; ilk açılış siyah flash'ı; miktar gösterimi tek "N kutu" formatı; canonical + Open Graph + JSON-LD marka sinyalleri.
+- **Erişilebilirlik**: Ortak erişilebilir modal kabuğu (focus trap, Escape, aria), ≥44px dokunma hedefleri, `prefers-reduced-motion` desteği.
 
 ### v2.6.1
 - **Güvenlik (Dependabot)**: `uuid` paketindeki "Missing buffer bounds check" zafiyeti giderildi ve `firebase-tools` alt bağımlılıkları güvenli sürüme güncellendi.
