@@ -13,7 +13,7 @@
 //   sayaçlar ve HTTP durum kodları loglanır.
 
 import webpush from 'web-push';
-import { getFirestoreToken, withRetry } from './lib/firestore-auth.js';
+import { getFirestoreToken, resolveFirebaseProjectId, withRetry } from './lib/firestore-auth.js';
 import {
   listAll, getField, decodeFields, docId, deleteDoc, createDocIfAbsent, setDoc,
 } from './lib/firestore-values.js';
@@ -72,7 +72,7 @@ export function dedupeSubscriptions(subDocs) {
  * Tek aboneliğe bildirim gönderir; 404/410'da Firestore dokümanlarını temizler.
  * @returns {'sent'|'stale'|'failed'|'dry'}
  */
-async function sendToSubscription(token, userId, sub, payloadJson) {
+async function sendToSubscription(token, projectId, userId, sub, payloadJson) {
   if (DRY_RUN) return 'dry';
   try {
     await withRetry(
@@ -87,7 +87,7 @@ async function sendToSubscription(token, userId, sub, payloadJson) {
       for (const id of sub.docIds) {
         if (!id) continue;
         try {
-          await deleteDoc(token, FIREBASE_PROJECT_ID, `users/${userId}/pushSubscriptions/${id}`);
+          await deleteDoc(token, projectId, `users/${userId}/pushSubscriptions/${id}`);
         } catch {
           // Temizlik hatası ölümcül değil; bir sonraki çalıştırmada yeniden denenir
         }
@@ -108,8 +108,9 @@ async function main() {
     process.exit(1);
   }
 
+  const projectId = resolveFirebaseProjectId(serviceAccount, FIREBASE_PROJECT_ID);
   const token = await getFirestoreToken(serviceAccount);
-  const users = await listAll(token, FIREBASE_PROJECT_ID, 'users');
+  const users = await listAll(token, projectId, 'users');
   console.log(`[Bildirim] ${users.length} kullanıcı bulundu${DRY_RUN ? ' (DRY RUN)' : ''}`);
 
   const counters = {
@@ -126,7 +127,7 @@ async function main() {
     let subs = null;
     const getSubs = async () => {
       if (subs === null) {
-        const subDocs = await listAll(token, FIREBASE_PROJECT_ID, `users/${userId}/pushSubscriptions`);
+        const subDocs = await listAll(token, projectId, `users/${userId}/pushSubscriptions`);
         subs = dedupeSubscriptions(subDocs);
       }
       return subs;
@@ -134,7 +135,7 @@ async function main() {
 
     // ── 1) SKT (son kullanma tarihi) uyarısı ─────────────────────────────────
     try {
-      const medicines = await listAll(token, FIREBASE_PROJECT_ID, `users/${userId}/medicines`);
+      const medicines = await listAll(token, projectId, `users/${userId}/medicines`);
       const expiring = medicines.filter(m => {
         const d = daysUntilExpiry(getField(m, 'expiryDate'));
         return d !== null && d >= 0 && d <= 30;
@@ -155,7 +156,7 @@ async function main() {
 
         let notified = false;
         for (const sub of await getSubs()) {
-          const result = await sendToSubscription(token, userId, sub, payloadJson);
+          const result = await sendToSubscription(token, projectId, userId, sub, payloadJson);
           counters[result]++;
           if (result === 'sent' || result === 'dry') notified = true;
         }
@@ -168,7 +169,7 @@ async function main() {
 
     // ── 2) Kutu bitiş (refill) uyarısı — yalnızca yeterli veri varsa ─────────
     try {
-      const schedDocs = await listAll(token, FIREBASE_PROJECT_ID, `users/${userId}/medicationSchedules`);
+      const schedDocs = await listAll(token, projectId, `users/${userId}/medicationSchedules`);
       for (const schedDoc of schedDocs) {
         const schedule = { id: docId(schedDoc), ...decodeFields(schedDoc) };
         if (schedule.enabled !== true || schedule.refillReminderEnabled !== true) continue;
@@ -183,7 +184,7 @@ async function main() {
         // Günlük idempotency anahtarı: refill_{scheduleId}_{YYYY-MM-DD}
         const refillKey = `refill_${schedule.id}_${todayKey}`;
         const created = await createDocIfAbsent(
-          token, FIREBASE_PROJECT_ID,
+          token, projectId,
           `users/${userId}/reminderDeliveries/${refillKey}`,
           {
             scheduleId: schedule.id,
@@ -211,13 +212,13 @@ async function main() {
         const payloadJson = JSON.stringify(payload);
 
         for (const sub of await getSubs()) {
-          const result = await sendToSubscription(token, userId, sub, payloadJson);
+          const result = await sendToSubscription(token, projectId, userId, sub, payloadJson);
           counters[result]++;
         }
         counters.refillSent++;
 
         try {
-          await setDoc(token, FIREBASE_PROJECT_ID, `users/${userId}/notifications/${refillKey}`, {
+          await setDoc(token, projectId, `users/${userId}/notifications/${refillKey}`, {
             type: 'refill',
             title: payload.title,
             body: payload.body,
@@ -234,11 +235,11 @@ async function main() {
     // ── 3) Eski teslimat kayıtlarını temizle (TTL politikası yoksa fallback) ─
     try {
       if (DRY_RUN) continue;
-      const deliveries = await listAll(token, FIREBASE_PROJECT_ID, `users/${userId}/reminderDeliveries`);
+      const deliveries = await listAll(token, projectId, `users/${userId}/reminderDeliveries`);
       for (const d of deliveries) {
         const createdAt = getField(d, 'createdAt');
         if (typeof createdAt === 'string' && createdAt < cleanupCutoff) {
-          await deleteDoc(token, FIREBASE_PROJECT_ID, `users/${userId}/reminderDeliveries/${docId(d)}`);
+          await deleteDoc(token, projectId, `users/${userId}/reminderDeliveries/${docId(d)}`);
           counters.deliveriesCleaned++;
         }
       }

@@ -30,10 +30,10 @@ jobs:
 
     steps:
       - name: Repo'yu checkout et
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Node.js kur
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '24'
 
@@ -44,7 +44,7 @@ jobs:
         env:
           VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
-          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_PROJECT_ID: drdepo-18481
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           VAPID_SUBJECT: mailto:yusufkaramuk10@gmail.com
           DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}

@@ -19,7 +19,7 @@
 // Kullanım: node scripts/send-reminders.js [--dry-run]
 
 import webpush from 'web-push';
-import { getFirestoreToken, withRetry } from './lib/firestore-auth.js';
+import { getFirestoreToken, resolveFirebaseProjectId, withRetry } from './lib/firestore-auth.js';
 import {
   runQuery, listAll, getField, decodeFields, docId, deleteDoc,
   createDocIfAbsent, updateDoc, setDoc,
@@ -80,7 +80,7 @@ function dedupeSubscriptions(subDocs) {
   return [...byEndpoint.values()];
 }
 
-async function sendToSubscription(token, userId, sub, payloadJson, counters) {
+async function sendToSubscription(token, projectId, userId, sub, payloadJson, counters) {
   try {
     await withRetry(
       () => webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, payloadJson),
@@ -93,7 +93,7 @@ async function sendToSubscription(token, userId, sub, payloadJson, counters) {
     if (status === 404 || status === 410) {
       for (const id of sub.docIds) {
         if (!id) continue;
-        try { await deleteDoc(token, FIREBASE_PROJECT_ID, `users/${userId}/pushSubscriptions/${id}`); } catch { /* sonraki koşuda */ }
+        try { await deleteDoc(token, projectId, `users/${userId}/pushSubscriptions/${id}`); } catch { /* sonraki koşuda */ }
       }
       counters.stale++;
     } else {
@@ -113,13 +113,14 @@ async function main() {
     process.exit(1);
   }
 
+  const projectId = resolveFirebaseProjectId(serviceAccount, FIREBASE_PROJECT_ID);
   const token = await getFirestoreToken(serviceAccount);
   const now = new Date();
 
   // Collection-group sorgusu: yalnızca etkin hatırlatıcılar okunur.
   // (Spark okuma kotası kullanıcı sayısına değil aktif hatırlatıcı sayısına bağlanır.
   //  firestore.indexes.json içindeki fieldOverride bu sorgu için gereklidir.)
-  const schedDocs = await runQuery(token, FIREBASE_PROJECT_ID, {
+  const schedDocs = await runQuery(token, projectId, {
     from: [{ collectionId: 'medicationSchedules', allDescendants: true }],
     where: {
       fieldFilter: {
@@ -152,7 +153,7 @@ async function main() {
         // İdempotency: önce delivery dokümanını yaz; zaten varsa bu slot işlenmiş demektir.
         if (DRY_RUN) { counters.delivered++; continue; }
         const created = await createDocIfAbsent(
-          token, FIREBASE_PROJECT_ID,
+          token, projectId,
           `users/${userId}/reminderDeliveries/${slot.slotId}`,
           {
             scheduleId,
@@ -166,7 +167,7 @@ async function main() {
 
         // Abonelikleri (kullanıcı başına bir kez) çek
         if (!subsCache.has(userId)) {
-          const subDocs = await listAll(token, FIREBASE_PROJECT_ID, `users/${userId}/pushSubscriptions`);
+          const subDocs = await listAll(token, projectId, `users/${userId}/pushSubscriptions`);
           subsCache.set(userId, dedupeSubscriptions(subDocs));
         }
         const subs = subsCache.get(userId);
@@ -194,13 +195,13 @@ async function main() {
 
         let anySent = false;
         for (const sub of subs) {
-          const ok = await sendToSubscription(token, userId, sub, payloadJson, counters);
+          const ok = await sendToSubscription(token, projectId, userId, sub, payloadJson, counters);
           anySent = anySent || ok;
         }
 
         // Uygulama içi bildirim merkezi kaydı (deterministik id → yinelenmez)
         try {
-          await setDoc(token, FIREBASE_PROJECT_ID, `users/${userId}/notifications/${slot.slotId}`, {
+          await setDoc(token, projectId, `users/${userId}/notifications/${slot.slotId}`, {
             type: 'intake',
             title: payload.title,
             body: payload.body,
@@ -211,7 +212,7 @@ async function main() {
         } catch { /* inbox kaydı kritik değil */ }
 
         try {
-          await updateDoc(token, FIREBASE_PROJECT_ID, `users/${userId}/reminderDeliveries/${slot.slotId}`, {
+          await updateDoc(token, projectId, `users/${userId}/reminderDeliveries/${slot.slotId}`, {
             status: anySent ? 'sent' : (subs.length === 0 ? 'no-subscription' : 'failed'),
             sentAt: new Date().toISOString(),
           });

@@ -14,12 +14,12 @@ jobs:
 
     steps:
       - name: Repo'yu checkout et
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Node.js kur
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: xlsx paketini kur
         run: npm install xlsx --no-save

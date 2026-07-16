@@ -5,6 +5,33 @@
 import { createSign } from 'crypto';
 
 /**
+ * Workflow hedefi ile service account'un ayni Firebase projesine ait oldugunu
+ * dogrular. Yanlis/eski proje secret'lari Firestore'da belirsiz bir 404 yerine
+ * baslangicta acik bir yapilandirma hatasi uretir.
+ */
+export function resolveFirebaseProjectId(serviceAccount, configuredProjectId) {
+  const accountProjectId = typeof serviceAccount?.project_id === 'string'
+    ? serviceAccount.project_id.trim()
+    : '';
+  const expectedProjectId = typeof configuredProjectId === 'string'
+    ? configuredProjectId.trim()
+    : '';
+
+  if (!expectedProjectId) {
+    throw new Error('FIREBASE_PROJECT_ID eksik');
+  }
+  if (!accountProjectId) {
+    throw new Error('Service account project_id alani eksik');
+  }
+  if (accountProjectId !== expectedProjectId) {
+    throw new Error(
+      `Service account proje uyusmazligi (beklenen: ${expectedProjectId}, bulunan: ${accountProjectId})`,
+    );
+  }
+  return expectedProjectId;
+}
+
+/**
  * FIREBASE_SERVICE_ACCOUNT JSON'ından Firestore erişim token'ı üretir.
  * Hata durumunda hassas veri içermeyen mesajla fırlatır.
  */
